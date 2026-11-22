@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sổ Tiến Độ Thi Công</title>
+<meta name="description" content="Lập và theo dõi tiến độ thi công theo đường găng (CPM): bảng WBS, Gantt, kế hoạch gốc, nguồn lực, đường cong S, báo cáo nhanh.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+</head>
+<body>
+<div class="app" id="app">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 26 26" aria-hidden="true"><rect x="1" y="1" width="24" height="24" rx="6" fill="var(--ink)"/><rect x="5" y="7" width="9" height="3" rx="1.5" fill="var(--accent-strong)"/><rect x="9" y="12" width="11" height="3" rx="1.5" fill="var(--surface)"/><rect x="14" y="17" width="7" height="3" rx="1.5" fill="var(--crit)"/></svg>
+      Sổ Tiến Độ
+    </div>
+    <button class="proj-btn" id="projBtn" title="Thông tin dự án"><span class="proj-name" id="projName"></span><span class="proj-sub" id="projSub"></span></button>
+    <div class="top-actions">
+      <button class="ib" id="bUndo" title="Hoàn tác (Ctrl+Z)"></button>
+      <button class="ib" id="bRedo" title="Làm lại (Ctrl+Y)"></button>
+      <span class="sep"></span>
+      <button class="tb" id="bNew"></button>
+      <button class="tb" id="bOpen" title="Mở tệp .json hoặc Excel (Ctrl+O)"></button>
+      <button class="tb" id="bSave" title="Lưu tệp .json (Ctrl+S)"></button>
+      <button class="tb" id="bXlsx" title="Xuất bảng tiến độ ra Excel"></button>
+      <button class="ib" id="bSettings" title="Cấu hình dự án"></button>
+      <button class="ib" id="bHelp" title="Phím tắt & hướng dẫn (F1)"></button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-view="plan" class="on">Tiến độ</button>
+    <button data-view="report">Báo cáo</button>
+    <span class="saved" id="saved">Đã lưu trên trình duyệt này</span>
+  </nav>
+
+  <section class="view" id="vPlan">
+    <div class="ribbon" id="ribbon"></div>
+    <div class="board" id="board">
+      <div class="split">
+        <div class="pane left"><div class="thead" id="lHead"></div><div class="tbody" id="lBody"></div></div>
+        <div class="splitter" id="splitter" title="Kéo để đổi độ rộng"></div>
+        <div class="pane right"><div class="ghead" id="gHead"></div><div class="gbody" id="gBody"></div></div>
+      </div>
+      <div class="res" id="res">
+        <div class="res-head"><button id="resToggle"><span class="chev"></span>Nguồn lực thi công</button></div>
+        <div class="res-body"><div class="res-left" id="resLeft"></div><div class="res-chart" id="resChart"></div></div>
+      </div>
+      <footer class="status" id="status"></footer>
+    </div>
+  </section>
+
+  <section class="view" id="vReport" hidden><div class="report" id="report"></div></section>
+</div>
+
+<input type="file" id="fileIn" accept=".json,.xlsx,.xls,.csv" hidden>
+<dialog id="dlg"></dialog>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
