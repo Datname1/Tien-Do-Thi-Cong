@@ -16,17 +16,18 @@ npm test         # kiểm thử thuật toán CPM
 npm run build    # tạo bản phát hành trong thư mục dist/
 ```
 
-## Triển khai lên Cloudflare Pages
+## Triển khai lên Cloudflare
 
-Trong Cloudflare: **Workers & Pages → Create → Pages → Connect to Git**, chọn repo này, rồi đặt:
+Repo đã nối với Cloudflare Workers (Workers & Pages → `tien-do-thi-cong`).
+Tệp `wrangler.jsonc` cho Cloudflare biết cách dựng trang: chạy `npm run build`
+rồi phát hành thư mục `dist/` dưới dạng trang tĩnh. Mỗi lần đẩy code lên `main`,
+Cloudflare tự dựng lại và cập nhật website.
 
-| Mục | Giá trị |
-|---|---|
-| Framework preset | None |
-| Build command | `npm run build` |
-| Build output directory | `dist` |
+Kiểm tra cấu hình trên máy:
 
-Mỗi lần đẩy code lên nhánh `main`, Cloudflare tự dựng lại trang.
+```bash
+npx wrangler deploy --dry-run
+```
 
 ## Cấu trúc
 
