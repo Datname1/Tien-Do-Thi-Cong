@@ -18,7 +18,12 @@ const ICONS = {
   file: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M12 12v6M9 15h6"/>',
   target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>', help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/>',
   chev: '<path d="m9 6 6 6-6 6"/>', pin: '<path d="M12 17v5M8 3h8l-1 6 3 3H6l3-3Z"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>',
-  zoom: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'
+  zoom: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  dup: '<rect x="4" y="4" width="11" height="11" rx="2"/><rect x="9" y="9" width="11" height="11" rx="2"/>',
+  cut: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/>',
+  above: '<path d="M12 19V9M7 14l5-5 5 5M5 4h14"/>', group: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M12 10v6M9 13h6"/>',
+  fold: '<path d="m7 15 5-5 5 5M7 20l5-5 5 5M5 4h14"/>', unfold: '<path d="m7 9 5 5 5-5M7 4l5 5 5-5M5 20h14"/>',
+  check: '<path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/>'
 };
 const icon = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]}</svg>`;
 
@@ -92,19 +97,31 @@ function renderRibbon() {
   const f = (k, l, c) => `<button class="rb ${UI.filter === k ? 'on' : ''}" data-filter="${k}">${l}${c != null ? ` <span class="cnt">${c}</span>` : ''}</button>`;
   const sc = k => `<button class="rb ${UI.scale === k ? 'on' : ''}" data-scale="${k}">${SCALES[k].label}</button>`;
   $('#ribbon').innerHTML = `
+    <div class="grp"><span class="gl">Bảng tạm</span>
+      <button class="rb" data-act="cut" title="Cắt dòng đã chọn (Ctrl+X)" aria-label="Cắt">${icon('cut')}</button>
+      <button class="rb" data-act="copy" title="Chép dòng đã chọn, dán được sang Excel (Ctrl+C)" aria-label="Chép">${icon('copy')}</button>
+      <button class="rb" data-act="pasteRows" title="Dán dòng đã chép vào dưới dòng đang chọn (Ctrl+V). Ctrl+V cũng dán được bảng copy từ Excel" aria-label="Dán">${icon('paste')}</button>
+    </div>
     <div class="grp"><span class="gl">Thêm</span>
       <button class="rb" data-act="addBelow" title="Thêm công việc bên dưới, tự nối FS với việc đang chọn (Insert)">${icon('plus')}Việc dưới</button>
+      <button class="rb" data-act="addAbove" title="Thêm công việc phía trên dòng đang chọn">${icon('above')}Việc trên</button>
       <button class="rb" data-act="addChild" title="Thêm việc con của dòng đang chọn">${icon('child')}Việc con</button>
+      <button class="rb" data-act="addGroup" title="Thêm hạng mục tổng hợp (kèm một việc con)">${icon('group')}Hạng mục</button>
       <button class="rb" data-act="addMs" title="Thêm mốc (0 ngày)">${icon('diamond')}Mốc</button>
-      <button class="rb" data-act="paste" title="Dán bảng copy từ Excel">${icon('paste')}Dán Excel</button>
+      <button class="rb" data-act="paste" title="Dán bảng copy từ Excel">${icon('sheet')}Dán Excel</button>
     </div>
     <div class="grp"><span class="gl">Cấu trúc</span>
-      <button class="rb" data-act="indent" title="Thụt lề (Alt+Shift+→)">${icon('indent')}</button>
-      <button class="rb" data-act="outdent" title="Lùi lề (Alt+Shift+←)">${icon('outdent')}</button>
-      <button class="rb" data-act="up" title="Lên trên (Alt+Shift+↑)">${icon('up')}</button>
-      <button class="rb" data-act="down" title="Xuống dưới (Alt+Shift+↓)">${icon('down')}</button>
-      <button class="rb" data-act="dup" title="Nhân đôi dòng (kèm việc con)">${icon('copy')}</button>
-      <button class="rb danger" data-act="del" title="Xóa dòng đang chọn (Delete)">${icon('trash')}</button>
+      <button class="rb" data-act="indent" title="Thụt lề (Alt+Shift+→)" aria-label="Thụt lề">${icon('indent')}</button>
+      <button class="rb" data-act="outdent" title="Lùi lề (Alt+Shift+←)" aria-label="Lùi lề">${icon('outdent')}</button>
+      <button class="rb" data-act="up" title="Lên trên (Alt+↑)" aria-label="Lên trên">${icon('up')}</button>
+      <button class="rb" data-act="down" title="Xuống dưới (Alt+↓)" aria-label="Xuống dưới">${icon('down')}</button>
+      <button class="rb" data-act="dup" title="Nhân đôi dòng đã chọn, kèm việc con (Ctrl+D)" aria-label="Nhân đôi">${icon('dup')}</button>
+      <button class="rb danger" data-act="del" title="Xóa dòng đã chọn (Delete)" aria-label="Xóa">${icon('trash')}</button>
+    </div>
+    <div class="grp"><span class="gl">Xem</span>
+      <button class="rb" data-act="collapseAll" title="Thu gọn hết các hạng mục (Alt+-)" aria-label="Thu gọn hết">${icon('fold')}</button>
+      <button class="rb" data-act="expandAll" title="Mở rộng hết (Alt+=)" aria-label="Mở rộng hết">${icon('unfold')}</button>
+      <button class="rb" data-act="check" title="Kiểm tra dữ liệu: liên kết hở, vòng lặp, % sai trình tự">${icon('check')}Kiểm tra</button>
     </div>
     <div class="grp"><span class="gl">Lọc</span>${f('all', 'Tất cả')}${f('crit', 'Đường găng', nCrit)}${f('late', 'Chậm', nLate)}${f('week', '2 tuần tới')}</div>
     <div class="grp"><span class="gl">Thang đo</span>${sc('day')}${sc('week')}${sc('month')}</div>
@@ -131,13 +148,13 @@ function renderTable() {
   let h = '';
   for (const i of VIS) {
     const t = T[i], sum = st.isSum[i], ms = !sum && (+t.dur || 0) === 0;
-    const crit = S.crit[i] && !sum, sel = t.id === UI.sel;
+    const crit = S.crit[i] && !sum, sel = SELS.has(t.id), cur = sel && SELS.size > 1 && t.id === UI.sel;
     const tf = S.tf[i];
     const tfTxt = sum ? '<span class="muted">—</span>' : (tf <= 0 ? `<span class="tf-crit">0d</span>` : `<span class="ro">+${tf}d</span>`);
     const v = S.vr[i];
     const vTxt = v == null ? '<span class="muted">—</span>' : v > 0 ? `<span class="var-bad">+${v}d</span>` : v < 0 ? `<span class="var-good">−${-v}d</span>` : '<span class="muted">0d</span>';
     const pv = Math.round(S.pct[i]);
-    h += `<div class="tr grid ${sum ? 'sum' : ''} ${sel ? 'sel' : ''}" data-id="${t.id}" data-i="${i}">
+    h += `<div class="tr grid ${sum ? 'sum' : ''} ${sel ? 'sel' : ''} ${cur ? 'cur' : ''}" data-id="${t.id}" data-i="${i}">
       <div class="td c c-stt" title="Chọn dòng">${i + 1}</div>
       <div class="td c-wbs">${st.wbs[i]}</div>
       <div class="td c-name" style="--lvl:${t.level}">${sum ? `<button class="chev ${col.has(t.id) ? '' : 'open'}" data-tog="${t.id}" title="Thu gọn / mở rộng">${icon('chev')}</button>` : '<span class="chev-sp"></span>'}${ms ? '<span class="dia"></span>' : ''}${crit ? '<span class="badge crit">GĂNG</span>' : (!sum && S.late[i] ? '<span class="badge late">CHẬM</span>' : '')}<input data-col="name" value="${esc(t.name)}" aria-label="Tên công việc"></div>
@@ -307,7 +324,7 @@ function renderRes() {
 function renderStatus() {
   const n = S.leaves.length, c = S.leaves.filter(i => S.crit[i]).length;
   const cal = S.projFinish - S.projStart + 1;
-  $('#status').innerHTML = `<span><b>${n}</b> việc</span><span class="crit"><b class="crit">${c}</b> việc găng</span>
+  $('#status').innerHTML = `<span id="selCount" class="selc">${SELS.size > 1 ? `Đang chọn ${SELS.size} dòng` : ''}</span><span><b>${n}</b> việc</span><span class="crit"><b class="crit">${c}</b> việc găng</span>
     <span>Khởi công <b>${fmtD(S.projStart)}</b> → Hoàn thành <b>${fmtD(S.projFinish)}</b></span>
     <span><b>${S.workDays}</b> ngày làm việc · ${cal} ngày lịch</span>
     <span>Thực tế <b>${S.actualPct.toFixed(1)}%</b> / KH <b>${S.plannedPct.toFixed(1)}%</b></span>
@@ -398,7 +415,7 @@ function zaloText(lateL, doing, ahead, gap, pfVar) {
 /* ---------- render all ---------- */
 function renderAll(opts = {}) {
   S = schedule(P, P.useDataDate !== false);
-  computeVisible();
+  computeVisible(); syncSel();
   $('#projName').textContent = P.name || 'Dự án chưa đặt tên';
   $('#projSub').textContent = `${S.leaves.length} công việc · ${P.contractor || 'Tuần ' + P.workweek + ' ngày'}`;
   $('#bUndo').disabled = !undoStack.length; $('#bRedo').disabled = !redoStack.length;
@@ -409,43 +426,120 @@ function renderAll(opts = {}) {
   persist();
 }
 
-/* ---------- mutations ---------- */
+/* ---------- selection ---------- */
 const idxById = id => P.tasks.findIndex(t => t.id === id);
 function selIdx() { const i = UI.sel ? idxById(UI.sel) : -1; return i; }
-function select(id) {
-  UI.sel = id;
-  document.querySelectorAll('#lBody .tr.sel').forEach(r => r.classList.remove('sel'));
-  const row = document.querySelector(`#lBody .tr[data-id="${id}"]`); if (row) row.classList.add('sel');
-  const r = VIS.findIndex(i => P.tasks[i].id === id), g = document.getElementById('gSel');
+let SELS = new Set(), anchorId = null;
+function syncSel() {
+  const ids = new Set(P.tasks.map(t => t.id));
+  SELS = new Set([...SELS].filter(id => ids.has(id)));
+  if (UI.sel && !ids.has(UI.sel)) UI.sel = null;
+  if (UI.sel && !SELS.has(UI.sel)) SELS = new Set([UI.sel]);
+  if (!UI.sel && SELS.size) UI.sel = [...SELS][0];
+}
+function select(id, mode = 'single') {
+  if (mode === 'toggle') { if (SELS.has(id) && SELS.size > 1) { SELS.delete(id); if (UI.sel === id) UI.sel = [...SELS][0]; } else { SELS.add(id); UI.sel = id; } anchorId = id; }
+  else if (mode === 'range' && anchorId) {
+    const a = VIS.findIndex(i => P.tasks[i].id === anchorId), b = VIS.findIndex(i => P.tasks[i].id === id);
+    if (a >= 0 && b >= 0) SELS = new Set(VIS.slice(Math.min(a, b), Math.max(a, b) + 1).map(i => P.tasks[i].id)); else SELS = new Set([id]);
+    UI.sel = id;
+  } else { SELS = new Set([id]); anchorId = id; UI.sel = id; }
+  paintSel();
+}
+function paintSel() {
+  document.querySelectorAll('#lBody .tr').forEach(r => { r.classList.toggle('sel', SELS.has(r.dataset.id)); r.classList.toggle('cur', r.dataset.id === UI.sel && SELS.size > 1); });
+  const r = VIS.findIndex(i => P.tasks[i].id === UI.sel), g = document.getElementById('gSel');
   if (g) { if (r < 0) g.setAttribute('visibility', 'hidden'); else { g.removeAttribute('visibility'); g.setAttribute('y', r * RH); } }
+  const n = $('#selCount'); if (n) n.textContent = SELS.size > 1 ? `Đang chọn ${SELS.size} dòng` : '';
+}
+// Top-level blocks [start, end] covering the selected rows (a summary carries its children)
+function selectedBlocks() {
+  const st = S.st, idx = [...SELS].map(idxById).filter(i => i >= 0).sort((a, b) => a - b), out = []; let last = -1;
+  for (const i of idx) { if (i <= last) continue; out.push([i, st.end[i]]); last = st.end[i]; }
+  return out;
+}
+// Where a new row goes: below the selected row (as first child when it is an open summary)
+function insertionPoint() {
+  const T = P.tasks, st = S.st, i = selIdx();
+  if (i < 0) return { pos: T.length, lvl: T.length ? Math.max(1, T[T.length - 1].level) : 0, after: T.length ? T.length - 1 : -1 };
+  if (st.isSum[i] && !UI.collapsed.includes(T[i].id)) return { pos: i + 1, lvl: T[i].level + 1, after: -1 };
+  return { pos: st.end[i] + 1, lvl: T[i].level, after: i };
 }
 function insertAt(pos, task) { P.tasks.splice(pos, 0, task); }
 function newTask(o) { return Object.assign({ id: newId(), level: 1, name: 'Công việc mới', dur: 3, preds: [], res: '', pct: 0, snet: null, bl: null }, o); }
+function focusNew(id) { UI.sel = id; SELS = new Set([id]); anchorId = id; if (UI.filter !== 'all') UI.filter = 'all'; pendingFocus = { id, col: 'name' }; renderAll(); flushFocus(); }
+
+/* ---------- clipboard (rows) ---------- */
+let CLIP = null, CLIP_TSV = '', CLIP_CUT = false;
+function blockRows(B) {
+  const rows = [];
+  B.forEach(([a, b]) => { const base = P.tasks[a].level; for (let j = a; j <= b; j++) { const t = JSON.parse(JSON.stringify(P.tasks[j])); t.level -= base; rows.push(t); } });
+  return rows;
+}
+function rowsToTsv(rows) {
+  const pos = new Map(rows.map((t, k) => [t.id, k + 1]));
+  const out = ['STT\tCấp\tTên công việc\tNgày\tLK trước\tNguồn lực\t%'];
+  rows.forEach((t, k) => {
+    const lk = (t.preds || []).filter(l => pos.has(l.id)).map(l => { let s = String(pos.get(l.id)); if (l.type !== 'FS' || l.lag) s += l.type; if (l.lag) s += (l.lag > 0 ? '+' : '') + l.lag; return s; }).join(', ');
+    out.push([k + 1, t.level, t.name, +t.dur || 0, lk, t.res || '', +t.pct || 0].join('\t'));
+  });
+  return out.join('\n');
+}
+function copySel(cut) {
+  const B = selectedBlocks(); if (!B.length) { toast('Hãy chọn dòng trước (bấm vào số STT, giữ Shift hoặc Ctrl để chọn nhiều).', true); return; }
+  CLIP = blockRows(B); CLIP_TSV = rowsToTsv(CLIP); CLIP_CUT = !!cut;
+  try { navigator.clipboard && navigator.clipboard.writeText(CLIP_TSV).catch(() => {}); } catch {}
+  if (cut) { deleteBlocks(B, true); toast(`Đã cắt ${CLIP.length} dòng · chọn vị trí rồi bấm Dán (Ctrl+V)`); }
+  else toast(`Đã chép ${CLIP.length} dòng · Ctrl+V để dán, hoặc dán sang Excel`);
+}
+function pasteRows(rows, label, keepBl) {
+  const T = P.tasks, { pos, lvl } = insertionPoint(), map = new Map(), exists = new Set(T.map(t => t.id));
+  const copies = rows.map(t => { const c = JSON.parse(JSON.stringify(t)); c.id = newId(); map.set(t.id, c.id); c.level = (t.level || 0) + lvl; if (!keepBl) c.bl = null; return c; });
+  copies.forEach(c => { c.preds = (c.preds || []).map(l => map.has(l.id) ? { ...l, id: map.get(l.id) } : (exists.has(l.id) ? l : null)).filter(Boolean); });
+  pushUndo(); T.splice(pos, 0, ...copies);
+  SELS = new Set(copies.filter((c, k) => (rows[k].level || 0) === 0).map(c => c.id)); UI.sel = copies[0].id; anchorId = UI.sel;
+  if (UI.filter !== 'all') UI.filter = 'all';
+  renderAll(); toast(`Đã dán ${copies.length} dòng${label || ''}`);
+}
+function pasteClip() { if (!CLIP) { openPaste(); return; } pasteRows(CLIP, '', CLIP_CUT); }
+function deleteBlocks(B, silent) {
+  const T = P.tasks, gone = new Set(); B.forEach(([a, b]) => { for (let j = a; j <= b; j++) gone.add(T[j].id); });
+  const first = B[0][0]; pushUndo();
+  P.tasks = T.filter(t => !gone.has(t.id)); P.tasks.forEach(t => { t.preds = (t.preds || []).filter(l => !gone.has(l.id)); });
+  const nx = P.tasks[Math.min(first, P.tasks.length - 1)]; UI.sel = nx ? nx.id : null; SELS = new Set(UI.sel ? [UI.sel] : []); anchorId = UI.sel;
+  renderAll(); if (!silent) toast(`Đã xóa ${gone.size} dòng · Ctrl+Z để hoàn tác`);
+}
+
+/* ---------- row actions ---------- */
 function act(a) {
   const T = P.tasks, i = selIdx(), st = S.st;
   const needSel = () => { if (i < 0) { toast('Hãy chọn một dòng trước (bấm vào số STT).', true); return false; } return true; };
   if (a === 'addBelow' || a === 'addMs') {
-    pushUndo(); const ms = a === 'addMs';
-    let pos, lvl, preds = [];
-    if (i < 0) { pos = T.length; lvl = T.length ? Math.max(1, T[T.length - 1].level) : 0; if (T.length) { const last = T[T.length - 1]; if (!st.isSum[T.length - 1]) preds = [{ id: last.id, type: 'FS', lag: 0 }]; } }
-    else if (st.isSum[i] && !UI.collapsed.includes(T[i].id)) { pos = i + 1; lvl = T[i].level + 1; }
-    else { pos = st.end[i] + 1; lvl = T[i].level; if (!st.isSum[i]) preds = [{ id: T[i].id, type: 'FS', lag: 0 }]; }
-    const t = newTask({ level: lvl, preds, name: ms ? 'Mốc hoàn thành' : 'Công việc mới', dur: ms ? 0 : 3 });
-    insertAt(pos, t); UI.sel = t.id; if (UI.filter !== 'all') UI.filter = 'all';
-    pendingFocus = { id: t.id, col: 'name', selectAll: true }; renderAll(); flushFocus(); return;
+    const ms = a === 'addMs', { pos, lvl, after } = insertionPoint();
+    const preds = after >= 0 && !st.isSum[after] ? [{ id: T[after].id, type: 'FS', lag: 0 }] : [];
+    pushUndo(); const t = newTask({ level: lvl, preds, name: ms ? 'Mốc hoàn thành' : 'Công việc mới', dur: ms ? 0 : 3 });
+    insertAt(pos, t); focusNew(t.id); return;
+  }
+  if (a === 'addAbove') {
+    if (!needSel()) return; pushUndo(); const t = newTask({ level: T[i].level }); insertAt(i, t); focusNew(t.id); return;
   }
   if (a === 'addChild') {
     if (!needSel()) return; pushUndo();
     if (UI.collapsed.includes(T[i].id)) UI.collapsed = UI.collapsed.filter(x => x !== T[i].id);
-    const t = newTask({ level: T[i].level + 1 }); insertAt(st.end[i] + 1, t); UI.sel = t.id;
-    pendingFocus = { id: t.id, col: 'name', selectAll: true }; renderAll(); flushFocus(); return;
+    const t = newTask({ level: T[i].level + 1 }); insertAt(st.end[i] + 1, t); focusNew(t.id); return;
   }
-  if (a === 'indent') {
-    if (!needSel()) return; if (i === 0 || T[i - 1].level < T[i].level) { toast('Không thụt lề được: dòng phía trên phải cùng cấp hoặc sâu hơn.', true); return; }
-    pushUndo(); for (let j = i; j <= st.end[i]; j++) T[j].level++; renderAll(); return;
+  if (a === 'addGroup') {
+    const { pos, lvl } = insertionPoint(); pushUndo();
+    const g = newTask({ level: lvl, name: 'HẠNG MỤC MỚI', dur: 0 }), c = newTask({ level: lvl + 1 });
+    T.splice(pos, 0, g, c); focusNew(g.id); return;
   }
-  if (a === 'outdent') {
-    if (!needSel()) return; if (T[i].level === 0) return; pushUndo(); for (let j = i; j <= st.end[i]; j++) T[j].level--; renderAll(); return;
+  if (a === 'cut' || a === 'copy') return copySel(a === 'cut');
+  if (a === 'pasteRows') return pasteClip();
+  if (a === 'indent' || a === 'outdent') {
+    const B = selectedBlocks(); if (!B.length) { needSel(); return; }
+    const ok = B.filter(([s]) => a === 'indent' ? s > 0 && T[s - 1].level >= T[s].level : T[s].level > 0);
+    if (!ok.length) { if (a === 'indent') toast('Không thụt lề được: dòng phía trên phải cùng cấp hoặc sâu hơn.', true); return; }
+    pushUndo(); ok.forEach(([s, e]) => { for (let j = s; j <= e; j++) T[j].level += a === 'indent' ? 1 : -1; }); renderAll(); return;
   }
   if (a === 'up' || a === 'down') {
     if (!needSel()) return; const lv = T[i].level, e = st.end[i];
@@ -459,16 +553,19 @@ function act(a) {
     renderAll(); return;
   }
   if (a === 'dup') {
-    if (!needSel()) return; pushUndo(); const e = st.end[i], map = new Map();
-    const copies = T.slice(i, e + 1).map(t => { const c = JSON.parse(JSON.stringify(t)); c.id = newId(); map.set(t.id, c.id); return c; });
+    const B = selectedBlocks(); if (!B.length) { needSel(); return; }
+    const rows = blockRows(B), map = new Map(), lastEnd = B[B.length - 1][1];
+    const copies = rows.map(t => { const c = JSON.parse(JSON.stringify(t)); c.id = newId(); map.set(t.id, c.id); c.bl = null; return c; });
+    // keep each block's own base level
+    let k = 0; B.forEach(([s, e2]) => { const base = T[s].level; for (let j = s; j <= e2; j++, k++) copies[k].level = rows[k].level + base; });
     copies.forEach(c => { c.preds = c.preds.map(l => map.has(l.id) ? { ...l, id: map.get(l.id) } : l); });
-    copies[0].name += ' (bản sao)'; T.splice(e + 1, 0, ...copies); UI.sel = copies[0].id; renderAll(); toast('Đã nhân đôi ' + copies.length + ' dòng'); return;
+    if (B.length === 1) copies[0].name += ' (bản sao)';
+    pushUndo(); T.splice(lastEnd + 1, 0, ...copies); UI.sel = copies[0].id; SELS = new Set([UI.sel]); renderAll(); toast('Đã nhân đôi ' + copies.length + ' dòng'); return;
   }
-  if (a === 'del') {
-    if (!needSel()) return; pushUndo(); const e = st.end[i], gone = new Set(T.slice(i, e + 1).map(t => t.id));
-    T.splice(i, e - i + 1); T.forEach(t => { t.preds = (t.preds || []).filter(l => !gone.has(l.id)); });
-    UI.sel = T[Math.min(i, T.length - 1)]?.id || null; renderAll(); toast(`Đã xóa ${gone.size} dòng · Ctrl+Z để hoàn tác`); return;
-  }
+  if (a === 'del') { const B = selectedBlocks(); if (!B.length) { needSel(); return; } deleteBlocks(B); return; }
+  if (a === 'collapseAll') { UI.collapsed = P.tasks.filter((t, j) => st.isSum[j] && t.level > 0).map(t => t.id); renderAll(); return; }
+  if (a === 'expandAll') { UI.collapsed = []; renderAll(); return; }
+  if (a === 'check') return openCheck();
   if (a === 'paste') return openPaste();
   if (a === 'goData') return scrollToDay(S.dataDay);
   if (a === 'fit') return fitGantt();
@@ -478,6 +575,51 @@ function act(a) {
     if (has) confirmDlg('Chốt lại kế hoạch gốc?', 'Kế hoạch gốc hiện tại sẽ bị thay bằng ngày bắt đầu/kết thúc đang hiển thị. Cột “Lệch KHG” và đường cong S sẽ so với mốc mới.', 'Chốt lại', doIt);
     else doIt();
   }
+}
+
+/* ---------- data check ---------- */
+function dataIssues() {
+  const T = P.tasks, st = S.st, out = [], add = (i, sev, msg) => out.push({ i, sev, msg });
+  const succ = new Set();
+  T.forEach(t => (t.preds || []).forEach(l => { const p = S.idIdx.get(l.id); if (p == null) return; for (let j = p; j <= st.end[p]; j++) succ.add(j); }));
+  const hasPred = i => { for (let k = i; k >= 0; k = st.parent[k]) if ((T[k].preds || []).length) return true; return false; };
+  const endEF = S.leaves.length ? Math.max(...S.leaves.map(i => S.ef[i])) : 0;
+  const firstLeaf = S.leaves[0];
+  const known = new Set(Object.keys(P.resources || {}));
+  S.leaves.forEach(i => {
+    const t = T[i];
+    if (!String(t.name || '').trim()) add(i, 'err', 'Chưa có tên công việc');
+    if (S.cycle[i]) add(i, 'err', 'Liên kết bị vòng lặp: một liên kết đã được tạm bỏ qua để tính tiến độ');
+    if (S.badLink[i]) add(i, 'err', 'Liên kết không hợp lệ: tự nối với chính nó hoặc nối với hạng mục cha/con');
+    if (i !== firstLeaf && !hasPred(i)) add(i, 'warn', 'Đầu hở: chưa có việc trước, đang bắt đầu ngay từ ngày khởi công');
+    if (!succ.has(i) && S.ef[i] < endEF) add(i, 'warn', 'Đuôi hở: chưa có việc sau, trễ việc này không làm trễ việc nào khác');
+    if ((+t.dur || 0) > 60) add(i, 'warn', `Thời gian ${t.dur} ngày khá dài, nên chia nhỏ để dễ theo dõi`);
+    if (S.pct[i] > 0) (t.preds || []).forEach(l => { const p = S.idIdx.get(l.id); if (p != null && (l.type || 'FS') === 'FS' && S.pct[p] < 100) add(i, 'warn', `Đã có ${Math.round(S.pct[i])}% trong khi việc trước (STT ${p + 1}) mới ${Math.round(S.pct[p])}%`); });
+    if (S.pct[i] > 0 && S.start[i] > S.dataDay) add(i, 'warn', 'Đã có % hoàn thành nhưng ngày bắt đầu sau ngày báo cáo');
+    if (t.snet) add(i, 'info', `Đang ghim bắt đầu không sớm hơn ${fmtD(toDay(t.snet))}`);
+    parseRes(t.res).forEach(r => { if (!known.has(r.code)) add(i, 'info', `Mã nguồn lực “${r.code}” chưa khai báo trong Cấu hình (chưa có giới hạn/ngày)`); });
+  });
+  const rank = { err: 0, warn: 1, info: 2 }; out.sort((a, b) => rank[a.sev] - rank[b.sev] || a.i - b.i);
+  return out;
+}
+function openCheck() {
+  const list = dataIssues(), T = P.tasks;
+  const n = s => list.filter(x => x.sev === s).length;
+  const lbl = { err: 'Lỗi', warn: 'Cảnh báo', info: 'Lưu ý' };
+  const body = list.length ? `
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="pill bad">${n('err')} lỗi</span><span class="pill neu" style="color:var(--accent);background:var(--accent-bg)">${n('warn')} cảnh báo</span><span class="pill neu">${n('info')} lưu ý</span></div>
+    <div class="tbl-wrap"><table class="rt"><thead><tr><th>STT</th><th>Công việc</th><th>Vấn đề</th><th></th></tr></thead><tbody>
+    ${list.map(x => `<tr><td class="n">${x.i + 1}</td><td>${esc(T[x.i].name || '(chưa đặt tên)')}</td><td><span class="sev ${x.sev}">${lbl[x.sev]}</span> ${esc(x.msg)}</td><td><button class="tb" data-goto="${T[x.i].id}" style="height:26px">Tới dòng</button></td></tr>`).join('')}
+    </tbody></table></div>` : `<p style="margin:0;line-height:1.6">Không thấy vấn đề nào: mọi công việc đều có liên kết trước/sau hợp lý, không có vòng lặp hay liên kết sai.</p>`;
+  openDlg('Kiểm tra dữ liệu tiến độ', body, `<button class="tb primary" data-close>Đóng</button>`, d => {
+    d.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => { dlg.close(); gotoRow(b.dataset.goto); });
+  });
+}
+function gotoRow(id) {
+  const i = idxById(id); if (i < 0) return; UI.filter = 'all';
+  for (let p = S.st.parent[i]; p >= 0; p = S.st.parent[p]) UI.collapsed = UI.collapsed.filter(x => x !== P.tasks[p].id);
+  UI.sel = id; SELS = new Set([id]); anchorId = id; renderAll();
+  const r = VIS.indexOf(i); if (r >= 0) { lBody.scrollTop = Math.max(0, r * RH - lBody.clientHeight / 3); if (S.start[i] != null) scrollToDay(S.start[i]); }
 }
 function scrollToDay(d) { if (!G) return; $('#gBody').scrollLeft = Math.max(0, G.x(d) - 160); }
 function fitGantt() {
@@ -630,18 +772,20 @@ function openPaste() {
     <div class="fld"><label for="pTxt">Copy vùng bảng trong Excel rồi dán vào đây (Ctrl+V)</label>
       <textarea id="pTxt" spellcheck="false" style="min-height:200px" placeholder="Tên công việc&#9;Ngày&#9;LK trước&#9;Nguồn lực"></textarea>
       <div class="hint">Nhận cột theo tiêu đề: <b>Tên công việc</b>, <b>Ngày</b> (thời gian), <b>LK trước</b> (theo STT trong bảng dán), <b>WBS</b> hoặc <b>Cấp</b> (để dựng cây), <b>Nguồn lực</b>, <b>%</b>. Không có tiêu đề thì hiểu là: Tên · Ngày · LK trước.</div></div>
-    <label class="chk"><input type="radio" name="pMode" value="append" checked> Thêm vào cuối bảng</label>
+    <label class="chk"><input type="radio" name="pMode" value="insert" checked> Chèn dưới dòng đang chọn</label>
+    <label class="chk"><input type="radio" name="pMode" value="append"> Thêm vào cuối bảng</label>
     <label class="chk"><input type="radio" name="pMode" value="replace"> Thay toàn bộ bảng hiện tại</label>`,
     `<button class="tb" data-close>Hủy</button><button class="tb primary" id="pOk">Nhập</button>`,
     d => {
       setTimeout(() => d.querySelector('#pTxt').focus(), 30);
       d.querySelector('#pOk').onclick = () => {
         const txt = d.querySelector('#pTxt').value; const rows = txt.split(/\r?\n/).filter(l => l.trim()).map(l => l.split('\t'));
-        const r = importRows(rows, d.querySelector('input[name=pMode]:checked').value === 'replace'); if (r) dlg.close();
+        const r = importRows(rows, d.querySelector('input[name=pMode]:checked').value); if (r) dlg.close();
       };
     });
 }
-function importRows(rows, replace) {
+function importRows(rows, mode) {
+  const replace = mode === true || mode === 'replace';
   if (!rows.length) { toast('Không có dữ liệu để nhập.', true); return false; }
   const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').trim();
   let hi = -1, map = null;
@@ -672,7 +816,9 @@ function importRows(rows, replace) {
       T[k].preds.push({ id: T[j].id, type: m[2] || 'FS', lag: m[3] ? parseInt(m[3], 10) : 0 });
     });
   });
-  const minL = Math.min(...T.map(t => t.level)); T.forEach(t => t.level -= minL - (replace ? 0 : Math.min(1, minL)));
+  const minL = Math.min(...T.map(t => t.level));
+  if (mode === 'insert') { T.forEach(t => { t.level -= minL; }); pasteRows(T, ' từ Excel' + (bad ? ` · ${bad} liên kết không hiểu được đã bỏ qua` : '')); return true; }
+  T.forEach(t => t.level -= minL - (replace ? 0 : Math.min(1, minL)));
   pushUndo();
   if (replace) P.tasks = T; else P.tasks.push(...T);
   UI.filter = 'all'; renderAll(); toast(`Đã nhập ${T.length} dòng${bad ? ` · ${bad} liên kết không hiểu được đã bỏ qua` : ''}`);
@@ -688,9 +834,13 @@ function openHelp() {
       <span class="kbd">Insert</span><span>Thêm việc dưới dòng đang chọn (tự nối FS)</span>
       <span class="kbd">Delete</span><span>Xóa dòng đang chọn (khi không sửa ô)</span>
       <span class="kbd">Alt+Shift+→ / ←</span><span>Thụt lề / lùi lề (tạo hạng mục cha – con)</span>
-      <span class="kbd">Alt+Shift+↑ / ↓</span><span>Đưa dòng lên / xuống</span>
       <span class="kbd">Ctrl+Z / Ctrl+Y</span><span>Hoàn tác / làm lại</span>
       <span class="kbd">Ctrl+S / Ctrl+O</span><span>Lưu tệp .json / mở tệp</span>
+      <span class="kbd">Bấm STT + Shift / Ctrl</span><span>Chọn nhiều dòng liền nhau / chọn thêm từng dòng (Ctrl+A: chọn hết)</span>
+      <span class="kbd">Ctrl+C / Ctrl+X / Ctrl+V</span><span>Chép / cắt / dán dòng (khi không sửa ô). Dán được cả bảng copy từ Excel; dòng đã chép dán sang Excel được</span>
+      <span class="kbd">Ctrl+D</span><span>Nhân đôi dòng đã chọn</span>
+      <span class="kbd">Alt+↑ / Alt+↓</span><span>Đưa dòng lên / xuống</span>
+      <span class="kbd">Alt+- / Alt+=</span><span>Thu gọn / mở rộng tất cả hạng mục</span>
     </div>
     <div class="fld"><span class="lb">Cột LK trước (liên kết)</span><div class="hint" style="font-size:12.5px;color:var(--ink);line-height:1.7">
       Ghi theo số STT, cách nhau bằng dấu phẩy. <span class="code">3</span> = bắt đầu sau khi việc 3 xong (FS).
@@ -772,12 +922,16 @@ $('#ribbon').addEventListener('change', e => {
 });
 const lBody = $('#lBody'), gBody = $('#gBody');
 lBody.addEventListener('change', e => { const inp = e.target.closest('input[data-col]'); if (inp) commitCell(inp); });
-lBody.addEventListener('focusin', e => { const row = e.target.closest('.tr'); if (row && row.dataset.id !== UI.sel) select(row.dataset.id); });
+const selMode = e => e.shiftKey ? 'range' : (e.ctrlKey || e.metaKey) ? 'toggle' : 'single';
+lBody.addEventListener('focusin', e => { const row = e.target.closest('.tr'); if (row && !SELS.has(row.dataset.id)) select(row.dataset.id); });
 lBody.addEventListener('click', e => {
   const tog = e.target.closest('[data-tog]');
   if (tog) { const id = tog.dataset.tog; UI.collapsed = UI.collapsed.includes(id) ? UI.collapsed.filter(x => x !== id) : [...UI.collapsed, id]; renderAll(); return; }
-  const row = e.target.closest('.tr'); if (row) select(row.dataset.id);
+  const row = e.target.closest('.tr'); if (!row) return;
+  const mode = selMode(e); if (mode !== 'single' || e.target.closest('.c-stt') || !e.target.matches('input')) select(row.dataset.id, mode);
+  else if (SELS.size > 1 || UI.sel !== row.dataset.id) select(row.dataset.id);
 });
+lBody.addEventListener('mousedown', e => { if (e.shiftKey && e.target.closest('.c-stt')) e.preventDefault(); });
 lBody.addEventListener('keydown', e => {
   const inp = e.target.closest('input[data-col]'); if (!inp) return;
   if (e.key === 'Escape') { inp.value = inp.defaultValue; inp.blur(); e.stopPropagation(); return; }
@@ -790,7 +944,7 @@ lBody.addEventListener('keydown', e => {
 });
 lBody.addEventListener('scroll', () => { gBody.scrollTop = lBody.scrollTop; $('#lHead').scrollLeft = lBody.scrollLeft; });
 gBody.addEventListener('scroll', () => { lBody.scrollTop = gBody.scrollTop; $('#gHead').scrollLeft = gBody.scrollLeft; $('#resChart').scrollLeft = gBody.scrollLeft; });
-gBody.addEventListener('click', e => { const r = Math.floor((e.clientY - gBody.getBoundingClientRect().top + gBody.scrollTop) / RH); if (VIS[r] != null) select(P.tasks[VIS[r]].id); });
+gBody.addEventListener('click', e => { const r = Math.floor((e.clientY - gBody.getBoundingClientRect().top + gBody.scrollTop) / RH); if (VIS[r] != null) select(P.tasks[VIS[r]].id, selMode(e)); });
 $('#resToggle').onclick = () => { UI.resOpen = !UI.resOpen; renderRes(); persist(); };
 $('#res').addEventListener('change', e => {
   if (e.target.id === 'resSel') { UI.res = e.target.value; renderRes(); persist(); }
@@ -816,11 +970,28 @@ document.addEventListener('keydown', e => {
   if (k === 'F1') { e.preventDefault(); openHelp(); return; }
   if (UI.view !== 'plan') return;
   if (k === 'Insert') { e.preventDefault(); if (inField) e.target.blur(); setTimeout(() => act('addBelow'), 0); return; }
-  if (e.altKey && e.shiftKey && ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(k)) {
+  if (e.altKey && (e.shiftKey || k === 'ArrowUp' || k === 'ArrowDown') && ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(k)) {
     e.preventDefault(); if (inField) e.target.blur();
     setTimeout(() => act({ ArrowRight: 'indent', ArrowLeft: 'outdent', ArrowUp: 'up', ArrowDown: 'down' }[k]), 0); return;
   }
-  if (k === 'Delete' && !inField && UI.sel) { e.preventDefault(); act('del'); }
+  if (e.altKey && (k === '-' || k === '=' || k === '+')) { e.preventDefault(); act(k === '-' ? 'collapseAll' : 'expandAll'); return; }
+  if (inField) return;
+  const lk = k.toLowerCase();
+  if (ctrl && lk === 'c') { e.preventDefault(); act('copy'); return; }
+  if (ctrl && lk === 'x') { e.preventDefault(); act('cut'); return; }
+  if (ctrl && lk === 'd') { e.preventDefault(); act('dup'); return; }
+  if (ctrl && lk === 'a') { e.preventDefault(); SELS = new Set(VIS.map(i => P.tasks[i].id)); if (!UI.sel && VIS.length) UI.sel = P.tasks[VIS[0]].id; paintSel(); return; }
+  if (k === 'Escape' && SELS.size > 1) { select(UI.sel); return; }
+  if (k === 'Delete' && UI.sel) { e.preventDefault(); act('del'); }
+});
+// Ctrl+V outside a cell: rows copied in this app, or a table copied from Excel
+document.addEventListener('paste', e => {
+  if (dlg.open || UI.view !== 'plan' || e.target.matches('input,textarea,select')) return;
+  const txt = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+  e.preventDefault();
+  if (CLIP && (!txt || txt.replace(/\r/g, '') === CLIP_TSV)) { pasteClip(); return; }
+  if (/\t|\n/.test(txt.trim())) { const rows = txt.split(/\r?\n/).filter(l => l.trim()).map(l => l.split('\t')); importRows(rows, 'insert'); return; }
+  if (CLIP) pasteClip(); else toast('Chưa có dòng nào được chép. Chọn dòng rồi bấm Ctrl+C, hoặc copy một bảng trong Excel.', true);
 });
 let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (UI.view === 'plan') { renderGantt(); renderRes(); } }, 150); });
 

@@ -99,6 +99,14 @@ button{cursor:pointer}
 .tr:hover{background:var(--hover)}
 .tr.sum{background:var(--surface-2);font-weight:600}
 .tr.sel{background:var(--sel)}
+.tr.sel .c-stt{color:var(--accent);font-weight:700;box-shadow:inset 3px 0 0 var(--accent-strong)}
+.tr.cur .c-stt{background:var(--accent-bg)}
+.selc{color:var(--accent);font-weight:600}
+.selc:empty{display:none}
+.sev{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:4px;padding:0 5px;margin-right:4px}
+.sev.err{color:var(--crit);background:var(--crit-bg)}
+.sev.warn{color:var(--accent);background:var(--accent-bg)}
+.sev.info{color:var(--muted);background:var(--surface-2);border:1px solid var(--line)}
 .td{display:flex;align-items:center;padding:0 6px;border-right:1px solid var(--line);white-space:nowrap;overflow:hidden;min-width:0;position:relative}
 .td:focus-within{outline:2px solid var(--accent-strong);outline-offset:-2px;background:var(--surface)}
 .td.c{justify-content:center}

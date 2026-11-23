@@ -3,6 +3,8 @@
 Ứng dụng web lập và theo dõi tiến độ thi công theo phương pháp đường găng (CPM).
 
 - Bảng WBS sửa trực tiếp, liên kết FS/SS/FF/SF có độ trễ, tuần làm việc 5/6/7 ngày, ngày lễ
+- Chọn nhiều dòng (Shift/Ctrl + bấm STT), cắt/chép/dán dòng, dán thẳng bảng từ Excel
+- Kiểm tra dữ liệu: đầu/đuôi hở, vòng lặp, liên kết sai, % sai trình tự
 - Gantt: việc găng, dự trữ, kế hoạch gốc, ngày báo cáo, hôm nay
 - Biểu đồ nguồn lực, đường cong S, báo cáo nhanh gửi Zalo
 - Nhập/xuất Excel, lưu/mở tệp `.tiendo.json`
