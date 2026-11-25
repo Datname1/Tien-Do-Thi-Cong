@@ -7,6 +7,9 @@
 - Kiểm tra dữ liệu: đầu/đuôi hở, vòng lặp, liên kết sai, % sai trình tự
 - Nhập báo giá / BOQ Excel (mẫu Phúc Khang và bảng có cột Nội dung + Thành tiền): tạo tiến độ từ báo giá hoặc gắn giá trị vào tiến độ có sẵn; cảnh báo dòng tổng lệch dòng con
 - Dòng tiền theo tháng (chi theo tiến độ, thu theo đợt thanh toán), vốn cần ứng tối đa, chỉ số SPI/CPI
+- Cập nhật tuần (% thực tế, ghi chú vướng mắc, chi phí thực tế), lưu lịch sử để vẽ đường thực tế trên đường cong S
+- Look-ahead 3/4/6 tuần theo hạng mục, xuất Excel
+- Chế độ Họp giao ban toàn màn hình: tổng quan, tuần qua, việc chậm, 2 tuần tới, dòng tiền, đường găng
 - Gantt: việc găng, dự trữ, kế hoạch gốc, ngày báo cáo, hôm nay
 - Biểu đồ nguồn lực, đường cong S, báo cáo nhanh gửi Zalo
 - Nhập/xuất Excel, lưu/mở tệp `.tiendo.json`

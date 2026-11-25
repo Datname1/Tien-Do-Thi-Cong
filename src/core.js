@@ -247,6 +247,24 @@ function defaultPayments(P, S) {
   ].filter(p => p.kind !== 'task' || p.taskId);
 }
 
+/* Look-ahead: các việc chưa xong có ngày nằm trong N tuần tính từ tuần chứa ngày báo cáo */
+function lookAhead(P, S, weeks = 3) {
+  const D = S.dataDay, w0 = mondayOf(D);
+  const cols = Array.from({ length: weeks }, (_, k) => ({ s: w0 + 7 * k, e: w0 + 7 * k + 6, week: isoWeek(w0 + 7 * k) }));
+  const end = cols[cols.length - 1].e, st = S.st;
+  const groupOf = i => { let p = st.parent[i], g = -1; while (p >= 0) { if (P.tasks[p].level >= 1) g = p; p = st.parent[p]; } return g; };
+  const rows = S.leaves.filter(i => S.pct[i] < 100 && S.start[i] <= end && S.finish[i] >= w0)
+    .map(i => ({ i, group: groupOf(i), cells: cols.map(c => S.start[i] <= c.e && S.finish[i] >= c.s) }))
+    .sort((a, b) => a.group - b.group || S.start[a.i] - S.start[b.i] || a.i - b.i);
+  return { cols, rows };
+}
+/* Ảnh chụp tiến độ tại ngày báo cáo để vẽ đường thực tế và so sánh tuần này với tuần trước */
+function snapshot(P, S) {
+  const e = evm(P, S), pcts = {};
+  S.leaves.forEach(i => { if (S.pct[i] > 0) pcts[P.tasks[i].id] = Math.round(S.pct[i]); });
+  return { date: P.dataDate, actualPct: +S.actualPct.toFixed(2), plannedPct: +S.plannedPct.toFixed(2), ev: Math.round(e.EV), pv: Math.round(e.PV), ac: e.AC, pcts };
+}
+
 function fmtPreds(t, idIdx) {
   return (t.preds || []).map(l => {
     const k = idIdx.get(l.id); if (k == null) return null;
@@ -341,4 +359,4 @@ function setBaseline(P, S) {
   P.baselineAt = new Date().toISOString().slice(0, 10);
 }
 
-export { cashFlow, evm, defaultPayments, DAY, DEFAULT_RES, VN_HOLIDAYS, _idn, buildCal, buildTasks, dow, expandHolidays, fmtD, fmtDM, fmtPreds, isoOf, isoWeek, mkDay, mondayOf, newId, pad, parseDate, parsePreds, parseRes, sampleProject, schedule, setBaseline, structure, toDay };
+export { cashFlow, evm, defaultPayments, lookAhead, snapshot, DAY, DEFAULT_RES, VN_HOLIDAYS, _idn, buildCal, buildTasks, dow, expandHolidays, fmtD, fmtDM, fmtPreds, isoOf, isoWeek, mkDay, mondayOf, newId, pad, parseDate, parsePreds, parseRes, sampleProject, schedule, setBaseline, structure, toDay };

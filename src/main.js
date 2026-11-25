@@ -1,7 +1,7 @@
 import './styles.css';
 import * as XLSX from 'xlsx';
 import { DAY, DEFAULT_RES, VN_HOLIDAYS, _idn, buildCal, buildTasks, dow, expandHolidays, fmtD, fmtDM, fmtPreds, isoOf, isoWeek, mkDay, mondayOf, newId, pad, parseDate, parsePreds, parseRes, sampleProject, schedule, setBaseline, structure, toDay } from './core.js';
-import { cashFlow, evm, defaultPayments } from './core.js';
+import { cashFlow, evm, defaultPayments, lookAhead, snapshot } from './core.js';
 import { parseQuote, quoteSections, scheduleRowsFromQuote, matchSections, estimateDays, niceName, num as vnNum, fmtM } from './boq.js';
 /* ================= UI ================= */
 const $ = s => document.querySelector(s);
@@ -134,6 +134,8 @@ function renderRibbon() {
       <button class="rb" data-act="goData" title="Cuộn Gantt tới ngày báo cáo">${icon('target')}</button>
       <button class="rb" data-act="fit" title="Vừa màn hình">${icon('zoom')}</button>
       <button class="rb" data-act="baseline" title="Chốt kế hoạch gốc để so sánh">${icon('flag')}Lưu KH gốc</button>
+      <button class="rb" data-act="weekly" title="Cập nhật % hoàn thành, ghi chú và chuyển ngày báo cáo">${icon('check')}Cập nhật tuần</button>
+      <button class="rb" data-act="meeting" title="Trình chiếu họp giao ban toàn màn hình">${icon('target')}Họp giao ban</button>
     </div>`;
 }
 
@@ -164,7 +166,7 @@ function renderTable() {
     h += `<div class="tr grid ${money ? 'money' : ''} ${sum ? 'sum' : ''} ${sel ? 'sel' : ''} ${cur ? 'cur' : ''}" data-id="${t.id}" data-i="${i}">
       <div class="td c c-stt" title="Chọn dòng">${i + 1}</div>
       <div class="td c-wbs">${st.wbs[i]}</div>
-      <div class="td c-name" style="--lvl:${t.level}">${sum ? `<button class="chev ${col.has(t.id) ? '' : 'open'}" data-tog="${t.id}" title="Thu gọn / mở rộng">${icon('chev')}</button>` : '<span class="chev-sp"></span>'}${ms ? '<span class="dia"></span>' : ''}${crit ? '<span class="badge crit">GĂNG</span>' : (!sum && S.late[i] ? '<span class="badge late">CHẬM</span>' : '')}<input data-col="name" value="${esc(t.name)}" aria-label="Tên công việc"></div>
+      <div class="td c-name" style="--lvl:${t.level}">${sum ? `<button class="chev ${col.has(t.id) ? '' : 'open'}" data-tog="${t.id}" title="Thu gọn / mở rộng">${icon('chev')}</button>` : '<span class="chev-sp"></span>'}${ms ? '<span class="dia"></span>' : ''}${crit ? '<span class="badge crit">GĂNG</span>' : (!sum && S.late[i] ? '<span class="badge late">CHẬM</span>' : '')}<input data-col="name" value="${esc(t.name)}" aria-label="Tên công việc">${t.note ? `<span class="note-dot" title="${esc(t.note)}">!</span>` : ''}</div>
       <div class="td c num">${sum ? `<span class="ro">${S.ef[i] - S.es[i]}</span>` : `<input data-col="dur" value="${+t.dur || 0}" inputmode="numeric" aria-label="Số ngày">`}</div>
       <div class="td num">${sum ? `<span class="ro">${fmtD(S.start[i])}</span>` : `<input data-col="start" value="${fmtD(S.start[i])}" aria-label="Bắt đầu">${t.snet ? `<span title="Ghim bắt đầu không sớm hơn ${fmtD(toDay(t.snet))} – xóa ô để bỏ ghim">${icon('pin', 'pin')}</span>` : ''}`}</div>
       <div class="td"><span class="ro">${fmtD(S.finish[i])}</span></div>
@@ -384,11 +386,14 @@ function renderReport() {
     svg += `<line class="g-dd" x1="${sx(D)}" x2="${sx(D)}" y1="${Tp}" y2="${Hd - B}"/><circle class="s-act" cx="${sx(D)}" cy="${sy(S.actualPct)}" r="5"/>`;
     svg += `<text class="s-lbl" x="${sx(D) + 8}" y="${sy(S.actualPct) + 14}">Thực tế ${S.actualPct.toFixed(1)}%</text>`;
   }
+  const hist = (P.history || []).map(h => ({ d: toDay(h.date), v: h.actualPct })).filter(h => h.d != null && h.d >= sc.a && h.d <= sc.b && h.d <= D);
+  if (hist.length) svg += `<path class="s-hist" d="M${sx(sc.a).toFixed(1)} ${sy(0)}${hist.map(h => 'L' + sx(h.d).toFixed(1) + ' ' + sy(h.v).toFixed(1)).join('')}"/>` + hist.map(h => `<circle class="s-hpt" cx="${sx(h.d)}" cy="${sy(h.v)}" r="3"><title>${fmtD(h.d)}: ${h.v.toFixed(1)}%</title></circle>`).join('');
   svg += '</svg>';
   const row = i => `<tr><td>${esc(T[i].name)}${S.crit[i] ? ' <span class="badge crit">GĂNG</span>' : ''}</td><td class="n">${fmtDM(S.start[i])} → ${fmtDM(S.finish[i])}</td><td class="n">${Math.round(S.pct[i])}% / ${Math.round(S.planned[i])}%</td></tr>`;
   const tbl = (list, empty) => list.length ? `<div class="tbl-wrap"><table class="rt"><thead><tr><th>Công việc</th><th>Thời gian</th><th>TT / KH</th></tr></thead><tbody>${list.map(row).join('')}</tbody></table></div>` : `<div class="none">${empty}</div>`;
   $('#report').innerHTML = `<div class="rep-in">
-    <div class="rep-head"><div><h2>${esc(P.name)}</h2><p>Báo cáo tại ngày <b>${fmtD(D)}</b>${P.baselineAt ? ` · so với kế hoạch gốc chốt ngày ${fmtD(toDay(P.baselineAt))}` : ' · chưa chốt kế hoạch gốc'}</p></div></div>
+    <div class="rep-head"><div><h2>${esc(P.name)}</h2><p>Báo cáo tại ngày <b>${fmtD(D)}</b>${P.baselineAt ? ` · so với kế hoạch gốc chốt ngày ${fmtD(toDay(P.baselineAt))}` : ' · chưa chốt kế hoạch gốc'}</p></div>
+      <div class="rep-act"><button class="tb" data-top="weekly">${icon('check')}Cập nhật tuần</button><button class="tb primary" data-top="meeting">${icon('target')}Họp giao ban</button></div></div>
     <div class="kpis">
       <div class="kpi"><div class="k">Hoàn thành thực tế</div><div class="v">${S.actualPct.toFixed(1)}%</div><div class="s">Kế hoạch ${S.plannedPct.toFixed(1)}% ${pill(gap)}</div></div>
       <div class="kpi"><div class="k">Dự kiến hoàn thành</div><div class="v">${fmtD(S.projFinish)}</div><div class="s">${pfVar == null ? 'Chưa có kế hoạch gốc' : `So với KH gốc ${pill(pfVar, ' ngày', true)}`}</div></div>
@@ -406,7 +411,7 @@ function renderReport() {
       <div class="card"><h3>Việc đang chậm <span class="pill ${lateL.length ? 'bad' : 'good'}">${lateL.length}</span></h3>${tbl(lateL, 'Không có việc chậm so với kế hoạch tại ngày báo cáo.')}</div>
       <div class="card"><h3>Đang thi công</h3>${tbl(doing, 'Không có việc nào đang thi công.')}</div>
     </div>
-    <div class="card"><h3>Kế hoạch 2 tuần tới (${fmtDM(D)} – ${fmtDM(D + 14)})</h3>${tbl(ahead, 'Không có việc mới bắt đầu trong 2 tuần tới.')}</div>
+    ${lookAheadCard()}
   </div>`;
 }
 function zaloText(lateL, doing, ahead, gap, pfVar) {
@@ -417,7 +422,7 @@ function zaloText(lateL, doing, ahead, gap, pfVar) {
   if (S.hasMoney) { const e = evm(P, S); L.push(`• Giá trị đã thực hiện: ${fmtTy(S.leaves.reduce((a, i) => a + S.val[i] * S.pct[i] / 100, 0))} / ${fmtTy(S.totalVal)}${e.SPI != null ? ` (SPI ${e.SPI.toFixed(2)})` : ''}`); }
   L.push(`• Dự kiến hoàn thành: ${fmtD(S.projFinish)}${pfVar == null ? '' : pfVar > 0 ? ` (trễ ${pfVar} ngày so với KH gốc)` : pfVar < 0 ? ` (sớm ${-pfVar} ngày so với KH gốc)` : ' (đúng KH gốc)'}`);
   if (doing.length) { L.push('', 'ĐANG THI CÔNG:'); doing.slice(0, 8).forEach(i => L.push(`- ${T[i].name}: ${Math.round(S.pct[i])}%`)); }
-  if (lateL.length) { L.push('', 'VIỆC CHẬM CẦN XỬ LÝ:'); lateL.slice(0, 8).forEach(i => L.push(`- ${T[i].name}: TT ${Math.round(S.pct[i])}% / KH ${Math.round(S.planned[i])}%`)); }
+  if (lateL.length) { L.push('', 'VIỆC CHẬM CẦN XỬ LÝ:'); lateL.slice(0, 8).forEach(i => L.push(`- ${T[i].name}: TT ${Math.round(S.pct[i])}% / KH ${Math.round(S.planned[i])}%${T[i].note ? ` (${T[i].note})` : ''}`)); }
   if (ahead.length) { L.push('', '2 TUẦN TỚI:'); ahead.slice(0, 8).forEach(i => L.push(`- ${T[i].name} (${fmtDM(S.start[i])} – ${fmtDM(S.finish[i])})`)); }
   return L.join('\n');
 }
@@ -577,6 +582,8 @@ function act(a) {
   if (a === 'expandAll') { UI.collapsed = []; renderAll(); return; }
   if (a === 'check') return openCheck();
   if (a === 'money') { UI.money = !showMoney(); renderAll(); return; }
+  if (a === 'weekly') return openWeekly();
+  if (a === 'meeting') return openMeeting();
   if (a === 'paste') return openPaste();
   if (a === 'goData') return scrollToDay(S.dataDay);
   if (a === 'fit') return fitGantt();
@@ -1042,6 +1049,149 @@ function openAttach(secs) {
     });
 }
 
+/* ---------- cập nhật tuần ---------- */
+function openWeekly() {
+  const T = P.tasks, today = todayDay(), old = S.dataDay;
+  let newD = today > old ? today : old + 7, showAll = false;
+  const entered = new Map(); // id -> { pct, note }
+  const render = d => {
+    const Pn = Object.assign({}, P, { dataDate: isoOf(newD) }), Sn = schedule(Pn, P.useDataDate !== false);
+    const list = S.leaves.filter(i => showAll || (S.pct[i] < 100 && Sn.start[i] <= newD + 7) || entered.has(T[i].id)).sort((a, b) => S.start[a] - S.start[b] || a - b);
+    d.querySelector('#wRows').innerHTML = list.length ? list.map(i => {
+      const t = T[i], e = entered.get(t.id) || {}, pv = e.pct ?? Math.round(S.pct[i]), plan = Math.round(Sn.planned[i]);
+      const behind = pv < plan - 0.5;
+      return `<tr data-id="${t.id}">
+        <td class="n">${i + 1}</td>
+        <td>${esc(t.name)}${S.crit[i] ? ' <span class="badge crit">GĂNG</span>' : ''}<div class="muted" style="font-size:11px">${fmtDM(S.start[i])} → ${fmtDM(S.finish[i])}</div></td>
+        <td class="n r">${Math.round(S.pct[i])}%</td>
+        <td class="n r">${plan}%</td>
+        <td><div class="pctin ${behind ? 'behind' : ''}"><input data-w="pct" value="${pv}" inputmode="numeric" aria-label="% mới"><span>%</span><button type="button" class="tb" data-q="25">+25</button><button type="button" class="tb" data-q="100">Xong</button></div></td>
+        <td><input data-w="note" value="${esc(e.note ?? t.note ?? '')}" placeholder="Vướng mắc, ghi chú" class="wnote"></td></tr>`;
+    }).join('') : '<tr><td colspan="6" class="none">Không có công việc nào cần cập nhật trong tuần này.</td></tr>';
+  };
+  const stash = d => d.querySelectorAll('#wRows tr[data-id]').forEach(tr => {
+    const id = tr.dataset.id, t = P.tasks.find(x => x.id === id); if (!t) return;
+    const pct = Math.max(0, Math.min(100, Math.round(vnNum(tr.querySelector('[data-w="pct"]').value)))), note = tr.querySelector('[data-w="note"]').value.trim();
+    if (pct !== Math.round(+t.pct || 0) || note !== (t.note || '')) entered.set(id, { pct, note }); else entered.delete(id);
+  });
+  openDlg('Cập nhật tiến độ tuần', `
+    <div class="row3">
+      <div class="fld"><label for="wDate">Ngày báo cáo mới</label><input type="date" id="wDate" value="${isoOf(newD)}"><div class="hint">Lần trước: ${fmtD(old)}</div></div>
+      <div class="fld"><label for="wAc">Chi phí thực tế lũy kế (triệu)</label><input type="text" id="wAc" inputmode="decimal" value="${P.actualCost != null ? fmtTr(P.actualCost) : ''}" placeholder="Không bắt buộc"><div class="hint">Dùng để tính CPI</div></div>
+      <div class="fld"><span class="lb">Danh sách</span><label class="chk"><input type="checkbox" id="wAll"> Hiện tất cả công việc</label></div>
+    </div>
+    <div class="tbl-wrap qtbl" style="max-height:52vh"><table class="rt wtbl"><thead><tr><th>STT</th><th>Công việc</th><th class="r">Trước</th><th class="r">KH tới ngày</th><th>% thực tế</th><th>Ghi chú</th></tr></thead><tbody id="wRows"></tbody></table></div>
+    <div class="hint" style="font-size:12px">Ô % tô đỏ khi thấp hơn kế hoạch tới ngày báo cáo mới. Ghi chú sẽ hiện trong Họp giao ban và tin nhắn báo cáo.</div>`,
+    `<button class="tb" data-close>Hủy</button><button class="tb primary" id="wOk">Lưu cập nhật</button>`,
+    d => {
+      render(d);
+      d.querySelector('#wDate').onchange = e => { const v = toDay(e.target.value); if (v != null) { stash(d); newD = v; render(d); } };
+      d.querySelector('#wAll').onchange = e => { stash(d); showAll = e.target.checked; render(d); };
+      d.querySelector('#wRows').addEventListener('click', e => {
+        const b = e.target.closest('[data-q]'); if (!b) return; const inp = b.closest('tr').querySelector('[data-w="pct"]');
+        inp.value = b.dataset.q === '100' ? 100 : Math.min(100, Math.round(vnNum(inp.value)) + 25);
+      });
+      d.querySelector('#wOk').onclick = () => {
+        stash(d); pushUndo();
+        entered.forEach((e, id) => { const t = P.tasks.find(x => x.id === id); if (t) { t.pct = e.pct; t.note = e.note; } });
+        P.dataDate = isoOf(newD);
+        const ac = d.querySelector('#wAc').value.trim(); P.actualCost = ac ? Math.round(vnNum(ac) * 1e6) : (P.actualCost ?? null);
+        S = schedule(P, P.useDataDate !== false);
+        const snap = snapshot(P, S); P.history = (P.history || []).filter(h => h.date !== snap.date); P.history.push(snap); P.history.sort((a, b) => a.date < b.date ? -1 : 1);
+        dlg.close(); renderAll(); toast(`Đã cập nhật ${entered.size} công việc tới ngày ${fmtD(newD)}`);
+      };
+    });
+}
+
+/* ---------- look-ahead ---------- */
+function lookAheadCard() {
+  const W = UI.laWeeks || 3, la = lookAhead(P, S, W), T = P.tasks;
+  const seg = [3, 4, 6].map(w => `<button type="button" data-la="${w}" class="${w === W ? 'on' : ''}">${w} tuần</button>`).join('');
+  let body = '', lastG = null;
+  la.rows.forEach(r => {
+    if (r.group !== lastG) { lastG = r.group; body += `<tr class="la-g"><td colspan="${3 + W}">${r.group >= 0 ? esc(T[r.group].name) : 'Khác'}</td></tr>`; }
+    const i = r.i;
+    body += `<tr><td>${esc(T[i].name)}${S.crit[i] ? ' <span class="badge crit">GĂNG</span>' : ''}${S.late[i] ? ' <span class="badge late">CHẬM</span>' : ''}${T[i].note ? `<div class="la-note">${esc(T[i].note)}</div>` : ''}</td><td class="n">${fmtDM(S.start[i])} → ${fmtDM(S.finish[i])}</td><td class="n r">${Math.round(S.pct[i])}%</td>${r.cells.map(c => `<td class="la-c">${c ? `<i class="${S.crit[i] ? 'crit' : ''}"></i>` : ''}</td>`).join('')}</tr>`;
+  });
+  return `<div class="card" id="laCard"><h3>Look-ahead ${W} tuần <span class="pill neu">${la.rows.length} việc</span><span style="margin-left:auto;display:flex;gap:8px;align-items:center"><span class="seg">${seg}</span><button class="tb" data-top="laXlsx">${icon('sheet')}Xuất Excel</button></span></h3>
+    ${la.rows.length ? `<div class="tbl-wrap"><table class="rt la"><thead><tr><th>Công việc</th><th>Thời gian</th><th class="r">%</th>${la.cols.map(c => `<th class="la-h">T${c.week}<div>${fmtDM(c.s)}</div></th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>` : '<div class="none">Không có việc nào trong khoảng này.</div>'}</div>`;
+}
+function exportLookAhead() {
+  const W = UI.laWeeks || 3, la = lookAhead(P, S, W), T = P.tasks;
+  const aoa = [[`LOOK-AHEAD ${W} TUẦN – ${P.name}`], [`Ngày báo cáo ${fmtD(S.dataDay)}`], [], ['STT', 'Hạng mục', 'Công việc', 'Bắt đầu', 'Kết thúc', '% HT', 'Găng', 'Nguồn lực', 'Ghi chú', ...la.cols.map(c => `Tuần ${c.week} (${fmtDM(c.s)})`)]];
+  la.rows.forEach(r => aoa.push([r.i + 1, r.group >= 0 ? T[r.group].name : '', T[r.i].name, fmtD(S.start[r.i]), fmtD(S.finish[r.i]), Math.round(S.pct[r.i]), S.crit[r.i] ? 'Có' : '', T[r.i].res || '', T[r.i].note || '', ...r.cells.map(c => c ? '■' : '')]));
+  const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = [5, 22, 40, 11, 11, 6, 6, 14, 30, ...la.cols.map(() => ({ wch: 13 }))].map(w => typeof w === 'number' ? { wch: w } : w);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Look-ahead');
+  offerFile(safeName(P.name) + '-look-ahead.xlsx', new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]));
+}
+
+/* ---------- họp giao ban ---------- */
+let MEET = null;
+function meetingSlides() {
+  const T = P.tasks, D = S.dataDay, e = evm(P, S);
+  const gap = S.actualPct - S.plannedPct, pfVar = S.blFinish != null ? S.cal.idxOf(S.projFinish) - S.cal.idxOf(S.blFinish) : null;
+  const prev = (P.history || []).filter(h => h.date < P.dataDate).slice(-1)[0];
+  const moved = S.leaves.map(i => ({ i, from: prev ? (prev.pcts[T[i].id] || 0) : null, to: Math.round(S.pct[i]) }))
+    .filter(x => prev ? x.to > x.from : (x.to > 0 && x.to < 100));
+  const late = S.leaves.filter(i => S.late[i]).sort((a, b) => (S.planned[b] - S.pct[b]) - (S.planned[a] - S.pct[a]));
+  const next = S.leaves.filter(i => S.pct[i] < 100 && S.start[i] <= D + 13 && S.finish[i] >= D).sort((a, b) => S.start[a] - S.start[b]);
+  const crit = S.leaves.filter(i => S.crit[i]).sort((a, b) => S.start[a] - S.start[b]);
+  const li = (i, extra = '') => `<li><span class="m-n">${esc(T[i].name)}</span>${extra}</li>`;
+  const more = (arr, n) => arr.length > n ? `<li class="m-more">… và ${arr.length - n} việc khác</li>` : '';
+  const slides = [
+    `<div class="m-kicker">Họp giao ban · ${fmtD(D)}</div><h1>${esc(P.name)}</h1>
+     <div class="m-kpis">
+       <div><span>Thực tế / Kế hoạch</span><b>${S.actualPct.toFixed(1)}% <small>/ ${S.plannedPct.toFixed(1)}%</small></b><em class="${gap < -0.05 ? 'bad' : 'good'}">${gap >= 0 ? 'Vượt' : 'Chậm'} ${Math.abs(gap).toFixed(1)}%</em></div>
+       <div><span>Dự kiến hoàn thành</span><b>${fmtD(S.projFinish)}</b><em class="${pfVar > 0 ? 'bad' : 'good'}">${pfVar == null ? 'Chưa chốt KH gốc' : pfVar > 0 ? `Trễ ${pfVar} ngày` : pfVar < 0 ? `Sớm ${-pfVar} ngày` : 'Đúng KH gốc'}</em></div>
+       <div><span>Việc chậm</span><b>${late.length}</b><em>${S.leaves.filter(i => S.crit[i]).length} việc găng còn lại</em></div>
+       ${S.hasMoney ? `<div><span>SPI / CPI</span><b class="nowrap">${e.SPI == null ? '—' : e.SPI.toFixed(2)} <small>/ ${e.CPI == null ? '—' : e.CPI.toFixed(2)}</small></b><em>Đã làm ${fmtTy(e.EV)}</em></div>` : ''}
+     </div>`,
+    `<h2>${prev ? `Tuần qua (từ ${fmtD(toDay(prev.date))})` : 'Đang thi công'}</h2>${moved.length ? `<ul class="m-list">${moved.slice(0, 10).map(x => li(x.i, `<span class="m-p">${x.from != null ? x.from + '% → ' : ''}${x.to}%</span>`)).join('')}${more(moved, 10)}</ul>` : '<p class="m-empty">Chưa có công việc nào thay đổi.</p>'}`,
+    `<h2>Việc chậm &amp; vướng mắc</h2>${late.length ? `<ul class="m-list">${late.slice(0, 9).map(i => li(i, `<span class="m-p bad">TT ${Math.round(S.pct[i])}% / KH ${Math.round(S.planned[i])}%</span>${T[i].note ? `<div class="m-note">${esc(T[i].note)}</div>` : ''}`)).join('')}${more(late, 9)}</ul>` : '<p class="m-empty">Không có việc chậm so với kế hoạch.</p>'}`,
+    `<h2>Kế hoạch 2 tuần tới (${fmtDM(D)} – ${fmtDM(D + 13)})</h2>${next.length ? `<ul class="m-list">${next.slice(0, 10).map(i => li(i, `<span class="m-p">${fmtDM(S.start[i])} → ${fmtDM(S.finish[i])}${S.crit[i] ? ' · găng' : ''}</span>`)).join('')}${more(next, 10)}</ul>` : '<p class="m-empty">Không có việc trong 2 tuần tới.</p>'}`
+  ];
+  if (S.hasMoney) {
+    const cf = cashFlow(P, S), now = isoOf(D).slice(0, 7), M = cf.months.filter(m => m.key >= now).slice(0, 3);
+    const up = cf.stages.filter(x => x.day >= D).slice(0, 3);
+    slides.push(`<h2>Dòng tiền sắp tới</h2><div class="m-cols"><div><h3>Theo tháng</h3><ul class="m-list">${M.map(m => `<li><span class="m-n">${monthLabel(m.key)}</span><span class="m-p">Thu ${fmtTy(m.fcIn)} · Chi ${fmtTy(m.fcOut)}</span><div class="m-note ${m.fcCum < 0 ? 'bad' : ''}">Lũy kế ${fmtTy(m.fcCum)}</div></li>`).join('')}</ul></div>
+      <div><h3>Đợt thanh toán kế tiếp</h3>${up.length ? `<ul class="m-list">${up.map(x => `<li><span class="m-n">${esc(x.name)}</span><span class="m-p">${fmtTy(x.amount)} · ${fmtD(x.day)}</span></li>`).join('')}</ul>` : '<p class="m-empty">Không còn đợt nào.</p>'}</div></div>`);
+  }
+  slides.push(`<h2>Đường găng còn lại</h2>${crit.length ? `<ul class="m-list">${crit.slice(0, 10).map(i => li(i, `<span class="m-p">${fmtDM(S.start[i])} → ${fmtDM(S.finish[i])}</span>`)).join('')}${more(crit, 10)}</ul><p class="m-foot">Trễ bất kỳ việc nào ở đây là trễ ngày bàn giao.</p>` : '<p class="m-empty">Không còn việc găng.</p>'}`);
+  return slides;
+}
+function openMeeting() {
+  const slides = meetingSlides(); MEET = { k: 0, slides };
+  let el = document.getElementById('meet');
+  if (!el) { el = document.createElement('div'); el.id = 'meet'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Họp giao ban'); document.body.appendChild(el); }
+  const draw = () => {
+    el.innerHTML = `<div class="m-bar"><span>${esc(P.name)}</span><span class="m-dots">${slides.map((_, k) => `<button type="button" data-go="${k}" class="${k === MEET.k ? 'on' : ''}" aria-label="Trang ${k + 1}"></button>`).join('')}</span>
+      <span class="m-act"><button type="button" class="tb" data-m="full">Toàn màn hình</button><button type="button" class="tb" data-m="close">Đóng (Esc)</button></span></div>
+      <div class="m-slide">${slides[MEET.k]}</div>
+      <div class="m-nav"><button type="button" class="tb" data-m="prev" ${MEET.k ? '' : 'disabled'}>← Trước</button><span class="num">${MEET.k + 1} / ${slides.length}</span><button type="button" class="tb primary" data-m="next" ${MEET.k < slides.length - 1 ? '' : 'disabled'}>Tiếp →</button></div>`;
+  };
+  el.onclick = e => {
+    const b = e.target.closest('[data-m],[data-go]'); if (!b) return;
+    if (b.dataset.go) MEET.k = +b.dataset.go;
+    else if (b.dataset.m === 'next') MEET.k = Math.min(slides.length - 1, MEET.k + 1);
+    else if (b.dataset.m === 'prev') MEET.k = Math.max(0, MEET.k - 1);
+    else if (b.dataset.m === 'full') { const r = document.documentElement.requestFullscreen; if (r) document.documentElement.requestFullscreen().catch(() => {}); }
+    else if (b.dataset.m === 'close') return closeMeeting();
+    draw();
+  };
+  el.hidden = false; draw();
+  MEET.key = e => {
+    if (e.key === 'Escape') { closeMeeting(); return; }
+    if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); MEET.k = Math.min(slides.length - 1, MEET.k + 1); draw(); }
+    if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); MEET.k = Math.max(0, MEET.k - 1); draw(); }
+  };
+  document.addEventListener('keydown', MEET.key, true);
+}
+function closeMeeting() {
+  const el = document.getElementById('meet'); if (el) el.hidden = true;
+  if (MEET && MEET.key) document.removeEventListener('keydown', MEET.key, true); MEET = null;
+  if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+}
+
 /* ---------- files ---------- */
 const safeName = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'tien-do';
 function offerFile(filename, data) {
@@ -1095,7 +1245,8 @@ $('#bXlsx').innerHTML = icon('sheet') + '<span class="lbl">Xuất Excel</span>';
 $('#bQuote').innerHTML = icon('coins') + '<span class="lbl">Báo giá</span>';
 $('#bQuote').onclick = () => $('#quoteIn').click();
 $('#quoteIn').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if (f) readQuoteFile(f); });
-$('#report').addEventListener('click', e => { const b = e.target.closest('[data-top]'); if (!b) return; if (b.dataset.top === 'quote') $('#quoteIn').click(); if (b.dataset.top === 'payments') openPayments(); });
+$('#report').addEventListener('click', e => { const b = e.target.closest('[data-top]'); if (!b) return; if (b.dataset.top === 'quote') $('#quoteIn').click(); if (b.dataset.top === 'payments') openPayments(); if (b.dataset.top === 'weekly') openWeekly(); if (b.dataset.top === 'meeting') openMeeting(); if (b.dataset.top === 'laXlsx') exportLookAhead(); });
+$('#report').addEventListener('click', e => { const b = e.target.closest('[data-la]'); if (b) { UI.laWeeks = +b.dataset.la; renderAll(); } });
 $('#report').addEventListener('change', e => {
   if (e.target.id !== 'acIn') return; const v = e.target.value.trim();
   pushUndo(); P.actualCost = v ? Math.round(vnNum(v) * 1e6) : null; renderAll();
@@ -1160,7 +1311,7 @@ document.addEventListener('click', e => { if (e.target.id === 'copyZalo') copyTe
 
 document.addEventListener('keydown', e => {
   const k = e.key, ctrl = e.ctrlKey || e.metaKey, inField = e.target.matches('input,textarea,select');
-  if (dlg.open) return;
+  if (dlg.open || MEET) return;
   if (ctrl && !e.shiftKey && k.toLowerCase() === 'z') { if (inField && e.target.value !== e.target.defaultValue) return; e.preventDefault(); undo(); return; }
   if (ctrl && (k.toLowerCase() === 'y' || (e.shiftKey && k.toLowerCase() === 'z'))) { e.preventDefault(); redo(); return; }
   if (ctrl && k.toLowerCase() === 's') { e.preventDefault(); saveJson(); return; }

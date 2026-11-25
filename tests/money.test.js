@@ -71,3 +71,14 @@ test('dòng tiền: chi theo tiến độ, thu theo đợt, EVM', () => {
   assert.equal(e.use, 'cost'); assert.equal(e.BAC, 160e6); assert.equal(e.EV, 80e6); assert.ok(e.SPI > 0.99);
   assert.ok(defaultPayments(P, S).reduce((a, p) => a + p.pct, 0) <= 100);
 });
+test('look-ahead theo tuần và ảnh chụp tiến độ', async () => {
+  const { lookAhead, snapshot } = await import('../src/core.js');
+  const T = buildTasks([[0, 'GÓI', 0, '', '', 0], [1, 'A', 5, '', '', 100], [1, 'B', 10, '2', '', 30], [1, 'C', 30, '3', '', 0]]);
+  const P = { start: '2026-01-05', workweek: 6, dataDate: '2026-01-14', holidays: [], tasks: T };
+  const S = schedule(P, true);
+  const la = lookAhead(P, S, 3);
+  assert.equal(la.cols.length, 3); assert.equal(la.cols[0].s, S.cal.days[0] - ((new Date(S.cal.days[0] * 86400000).getUTCDay() + 6) % 7) + 7);
+  assert.deepEqual(la.rows.map(r => T[r.i].name), ['B', 'C']);
+  assert.ok(la.rows[0].cells[0]);
+  const snap = snapshot(P, S); assert.equal(snap.date, '2026-01-14'); assert.equal(snap.pcts[T[1].id], 100);
+});
