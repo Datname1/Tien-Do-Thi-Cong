@@ -365,3 +365,25 @@ table.la tr.la-g td{background:var(--surface-2);font-weight:700;font-size:11.5px
 .m-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:clamp(16px,3vw,40px)}
 .m-nav{display:flex;align-items:center;justify-content:center;gap:16px}
 .nowrap{white-space:nowrap}
+.d3bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.d3bar input[type=range]{flex:1 1 220px;min-width:160px;accent-color:var(--accent-strong)}
+.d3date{font-size:13px;min-width:86px}
+.d3sp{flex:1 1 0}
+.d3wrap{flex:1;min-height:320px;position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface-2);box-shadow:var(--shadow)}
+.stage{position:absolute;inset:0}
+.stage canvas{display:block;touch-action:none}
+.stage-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);padding:20px;text-align:center}
+.d3legend{position:absolute;left:12px;top:12px;max-width:min(300px,calc(100% - 24px));display:flex;flex-direction:column;gap:5px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12px;box-shadow:var(--shadow)}
+.d3legend b{font-size:13px}
+.d3hint{font-size:11px;margin-top:4px}
+.lg-todo{border:1.5px dashed var(--faint);background:transparent!important;height:10px!important}
+.d3info{position:absolute;right:12px;top:12px;width:min(320px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px}
+.d3i-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.d3i-h .ib{width:26px;height:26px}
+.d3i-p{height:6px;border-radius:3px;background:var(--line)}
+.d3i-p span{display:block;height:100%;border-radius:3px;background:var(--accent-strong)}
+.d3info ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.d3info li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding-bottom:4px}
+.links3d{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.links3d select{width:100%;border:1px solid var(--line-strong);border-radius:7px;background:var(--surface);font-size:12px}
+@media (max-width:760px){.d3wrap{min-height:60vh;flex:none}.d3legend{font-size:11px;max-width:200px}.d3hint{display:none}}

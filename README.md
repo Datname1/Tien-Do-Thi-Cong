@@ -10,6 +10,7 @@
 - Cập nhật tuần (% thực tế, ghi chú vướng mắc, chi phí thực tế), lưu lịch sử để vẽ đường thực tế trên đường cong S
 - Look-ahead 3/4/6 tuần theo hạng mục, xuất Excel
 - Chế độ Họp giao ban toàn màn hình: tổng quan, tuần qua, việc chậm, 2 tuần tới, dòng tiền, đường găng
+- Mô hình 3D khối (three.js): tầng và diện tích lấy từ báo giá hoặc đoán từ tên công việc, tự gắn công việc theo tầng, xem theo kế hoạch tại một ngày (có phát tự động) hoặc thực tế tại ngày báo cáo, chụp ảnh PNG
 - Gantt: việc găng, dự trữ, kế hoạch gốc, ngày báo cáo, hôm nay
 - Biểu đồ nguồn lực, đường cong S, báo cáo nhanh gửi Zalo
 - Nhập/xuất Excel, lưu/mở tệp `.tiendo.json`
@@ -40,6 +41,8 @@ npx wrangler deploy --dry-run
 
 - `src/core.js` — lõi tính CPM, lịch làm việc, dòng tiền, EVM, dữ liệu mẫu (không phụ thuộc giao diện)
 - `src/boq.js` — đọc báo giá/BOQ và dựng tiến độ từ báo giá
+- `src/model3d.js` — tầng, cấu kiện, gắn công việc, mức hoàn thành cho 3D
+- `src/view3d.js` — hiển thị 3D bằng three.js (chỉ tải khi mở tab 3D)
 - `src/main.js` — giao diện: bảng, Gantt, nguồn lực, báo cáo, hộp thoại
 - `src/styles.css` — giao diện sáng/tối
 - `tests/` — kiểm thử lõi CPM (`npm test`)

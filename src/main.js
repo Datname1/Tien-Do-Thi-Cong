@@ -2,6 +2,7 @@ import './styles.css';
 import * as XLSX from 'xlsx';
 import { DAY, DEFAULT_RES, VN_HOLIDAYS, _idn, buildCal, buildTasks, dow, expandHolidays, fmtD, fmtDM, fmtPreds, isoOf, isoWeek, mkDay, mondayOf, newId, pad, parseDate, parsePreds, parseRes, sampleProject, schedule, setBaseline, structure, toDay } from './core.js';
 import { cashFlow, evm, defaultPayments, lookAhead, snapshot } from './core.js';
+import { normalizeBuilding, buildElements, linksFor, progressAt } from './model3d.js';
 import { parseQuote, quoteSections, scheduleRowsFromQuote, matchSections, estimateDays, niceName, num as vnNum, fmtM } from './boq.js';
 /* ================= UI ================= */
 const $ = s => document.querySelector(s);
@@ -437,6 +438,7 @@ function renderAll(opts = {}) {
   $('#board').style.setProperty('--lw', UI.lw + 'px');
   renderRibbon();
   if (UI.view === 'plan') { renderHead(); renderTable(); renderGantt(); renderRes(); renderStatus(); }
+  else if (UI.view === '3d') render3d();
   else renderReport();
   persist();
 }
@@ -1192,6 +1194,121 @@ function closeMeeting() {
   if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
 }
 
+/* ---------- 3D ---------- */
+let V3 = null, V3sig = '', V3play = 0, V3pick = null, V3ctx = null;
+function d3Context() {
+  const B = normalizeBuilding(P), { els, height } = buildElements(B), L = linksFor(B, P, S);
+  const starts = S.leaves.map(i => Math.min(S.blS[i] ?? S.start[i], S.start[i])), fins = S.leaves.map(i => Math.max(S.blF[i] ?? S.finish[i], S.finish[i]));
+  const a = (starts.length ? Math.min(...starts) : S.projStart) - 3, b = (fins.length ? Math.max(...fins) : S.projFinish) + 3;
+  return { B, els, height, L, a, b };
+}
+function d3Progress(ctx) {
+  const mode = UI.d3mode || 'plan', day = mode === 'plan' ? UI.d3day : S.dataDay, prog = {};
+  ctx.els.forEach(e => { prog[e.key] = progressAt(ctx.L[e.key], P, S, day, mode); });
+  // tường nhiều tầng cùng gắn một công việc: xây lần lượt từ dưới lên
+  const groups = new Map();
+  ctx.els.filter(e => e.kind === 'wall' && prog[e.key]).forEach(e => { const sig = [...ctx.L[e.key]].sort().join(','); if (!groups.has(sig)) groups.set(sig, []); groups.get(sig).push(e); });
+  groups.forEach(list => { if (list.length < 2) return; const n = list.length; list.forEach((e, k) => { const p = prog[e.key]; prog[e.key] = { ...p, p: Math.max(0, Math.min(1, p.p * n - k)) }; }); });
+  return prog;
+}
+function render3d() {
+  const ctx = V3ctx = d3Context(), mode = UI.d3mode || 'plan';
+  if (UI.d3day == null || UI.d3day < ctx.a || UI.d3day > ctx.b) UI.d3day = Math.min(Math.max(S.dataDay, ctx.a), ctx.b);
+  $('#d3bar').innerHTML = `
+    <span class="seg"><button type="button" data-d3mode="plan" class="${mode === 'plan' ? 'on' : ''}">Kế hoạch theo ngày</button><button type="button" data-d3mode="actual" class="${mode === 'actual' ? 'on' : ''}">Thực tế tại ngày BC</button></span>
+    <button class="tb" data-d3="play" ${mode === 'plan' ? '' : 'disabled'}>${V3play ? '❚❚ Dừng' : '▶ Phát'}</button>
+    <input type="range" id="d3range" min="${ctx.a}" max="${ctx.b}" step="1" value="${mode === 'plan' ? UI.d3day : S.dataDay}" ${mode === 'plan' ? '' : 'disabled'} aria-label="Ngày xem mô hình">
+    <b class="num d3date" id="d3date">${fmtD(mode === 'plan' ? UI.d3day : S.dataDay)}</b>
+    <span class="d3sp"></span>
+    <button class="tb" data-d3="config">${icon('gear')}Cấu hình 3D</button>
+    <button class="tb" data-d3="links">${icon('child')}Gán công việc</button>
+    <button class="tb" data-d3="shot">${icon('save')}Chụp ảnh</button>
+    <button class="ib" data-d3="reset" title="Về góc nhìn ban đầu">${icon('zoom')}</button>`;
+  $('#d3legend').innerHTML = `<b>${esc(P.name)}</b><span class="muted">${ctx.B.floors.filter(f => f.kind === 'floor').length} tầng · mặt tiền ${ctx.B.width} m · cao ${ctx.height.toFixed(1)} m</span>
+    <span class="lg"><i class="sw lg-todo"></i>Chưa làm</span><span class="lg"><i class="sw" style="background:var(--accent-strong)"></i>Đang làm</span><span class="lg"><i class="sw" style="background:#b9bcc2"></i>Xong (khung)</span><span class="lg"><i class="sw" style="background:#c8764f"></i>Tường xây</span><span class="lg"><i class="sw" style="background:#efe7d8;border:1px solid var(--line)"></i>Đã hoàn thiện</span>${mode === 'actual' ? '<span class="lg"><i class="sw" style="background:var(--crit)"></i>Đang chậm</span>' : ''}
+    <span class="muted d3hint">Kéo để xoay · cuộn để phóng to · bấm vào khối để xem công việc</span>`;
+  if (!V3) {
+    $('#stage').innerHTML = '<div class="stage-load">Đang tải mô hình 3D…</div>';
+    import('./view3d.js').then(m => {
+      if (UI.view !== '3d') return;
+      $('#stage').innerHTML = '';
+      try { V3 = m.mount($('#stage'), { onPick: k => { V3pick = k; d3Info(); } }); }
+      catch { $('#stage').innerHTML = '<div class="stage-load">Trình duyệt này không hiển thị được 3D (WebGL bị tắt). Hãy thử Chrome hoặc Edge bản mới.</div>'; return; }
+      V3sig = ''; render3d();
+    }).catch(() => { $('#stage').innerHTML = '<div class="stage-load">Không tải được phần 3D. Kiểm tra kết nối mạng rồi mở lại tab.</div>'; });
+    return;
+  }
+  const sig = JSON.stringify([ctx.B.width, ctx.B.floors.map(f => [f.name, f.area, f.h, f.kind])]);
+  if (sig !== V3sig) { V3.build(ctx.B, ctx.els); V3sig = sig; }
+  V3.apply(d3Progress(ctx), { mode }); d3Info();
+}
+function d3Apply() { if (!V3 || !V3ctx) return; V3.apply(d3Progress(V3ctx), { mode: UI.d3mode || 'plan' }); $('#d3date').textContent = fmtD(UI.d3mode === 'actual' ? S.dataDay : UI.d3day); d3Info(); }
+function d3Info() {
+  const box = $('#d3info'); if (!box) return;
+  if (!V3pick || !V3ctx) { box.hidden = true; return; }
+  const e = V3ctx.els.find(x => x.key === V3pick); if (!e) { box.hidden = true; return; }
+  const ids = V3ctx.L[e.key] || [], T = P.tasks;
+  const prog = d3Progress(V3ctx)[e.key];
+  box.hidden = false;
+  box.innerHTML = `<div class="d3i-h"><b>${esc(e.label)}</b><button class="ib" data-d3="closeinfo" title="Đóng">${icon('x')}</button></div>
+    ${prog ? `<div class="d3i-p"><span style="width:${Math.round(prog.p * 100)}%"></span></div><div class="muted">${UI.d3mode === 'actual' ? 'Thực tế' : 'Kế hoạch tới ' + fmtD(UI.d3day)}: <b>${Math.round(prog.p * 100)}%</b> · ${fmtDM(prog.start)} → ${fmtDM(prog.finish)}</div>` : '<div class="muted">Chưa gắn công việc nào.</div>'}
+    <ul>${ids.map(id => { const i = S.idIdx.get(id); return i == null ? '' : `<li><span>${i + 1} · ${esc(T[i].name)}</span><span class="num">${Math.round(S.pct[i])}%</span></li>`; }).join('')}</ul>
+    <button class="tb" data-d3="links">Đổi công việc gắn</button>`;
+}
+function d3Play() {
+  if (V3play) { clearInterval(V3play); V3play = 0; render3d(); return; }
+  const ctx = V3ctx; if (!ctx) return; if (UI.d3day >= ctx.b) UI.d3day = ctx.a;
+  const step = Math.max(1, Math.round((ctx.b - ctx.a) / 160));
+  V3play = setInterval(() => {
+    UI.d3day = Math.min(ctx.b, UI.d3day + step); const r = $('#d3range'); if (r) r.value = UI.d3day; d3Apply();
+    if (UI.d3day >= ctx.b || UI.view !== '3d') { clearInterval(V3play); V3play = 0; if (UI.view === '3d') render3d(); }
+  }, 70);
+  render3d();
+}
+function open3dConfig() {
+  const B = normalizeBuilding(P);
+  const kinds = [['found', 'Móng / hầm'], ['floor', 'Tầng'], ['roof', 'Mái / sân thượng'], ['roofbox', 'Tum / mái thang']];
+  const row = f => `<tr><td><input data-f="name" value="${esc(f.name)}"></td><td><select data-f="kind">${kinds.map(([k, l]) => `<option value="${k}" ${f.kind === k ? 'selected' : ''}>${l}</option>`).join('')}</select></td><td style="width:90px"><input data-f="area" value="${f.area ? String(+f.area.toFixed(2)).replace('.', ',') : ''}" inputmode="decimal" placeholder="m²"></td><td style="width:80px"><input data-f="h" value="${String(f.h).replace('.', ',')}" inputmode="decimal"></td><td style="width:36px"><button class="ib" data-del type="button" title="Xóa">${icon('trash')}</button></td></tr>`;
+  openDlg('Cấu hình mô hình 3D', `
+    <div class="row2"><div class="fld"><label for="bW">Chiều rộng mặt tiền (m)</label><input type="text" id="bW" inputmode="decimal" value="${String(B.width).replace('.', ',')}"><div class="hint">Chiều sâu từng tầng = diện tích ÷ mặt tiền. Để trống diện tích thì lấy chiều sâu lớn nhất.</div></div>
+    <div class="fld"><span class="lb">Nguồn số liệu</span><div class="hint" style="font-size:12.5px">${(P.building && P.building.floors && P.building.floors.length) ? 'Đang dùng danh sách tầng đã lưu (từ báo giá hoặc tự nhập).' : 'Đang đoán số tầng từ tên công việc. Nhập báo giá có bảng diện tích để lấy diện tích từng tầng.'}</div></div></div>
+    <div class="tbl-wrap"><table class="rtab pay"><thead><tr><td class="lb">Tên tầng</td><td class="lb">Loại</td><td class="lb">Diện tích</td><td class="lb">Cao (m)</td><td></td></tr></thead><tbody id="bRows">${B.floors.map(row).join('')}</tbody></table></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="tb" id="bAdd" type="button">${icon('plus')}Thêm tầng</button><button class="tb" id="bAuto" type="button">Đoán lại từ tên công việc</button></div>`,
+    `<button class="tb" data-close>Hủy</button><button class="tb primary" id="bOk">Lưu</button>`,
+    d => {
+      const body = d.querySelector('#bRows');
+      body.addEventListener('click', e => { const b = e.target.closest('[data-del]'); if (b) b.closest('tr').remove(); });
+      d.querySelector('#bAdd').onclick = () => { const trs = body.querySelectorAll('tr'); const ref = trs[trs.length - 1]; const html = row({ name: 'Lầu mới', kind: 'floor', area: 0, h: 3.4 }); const roofRow = [...trs].find(tr => ['roof', 'roofbox'].includes(tr.querySelector('[data-f="kind"]').value)); if (roofRow) roofRow.insertAdjacentHTML('beforebegin', html); else if (ref) ref.insertAdjacentHTML('afterend', html); else body.innerHTML = html; };
+      d.querySelector('#bAuto').onclick = () => { pushUndo(); P.building = { ...(P.building || {}), floors: [] }; dlg.close(); renderAll(); toast('Đã đoán lại số tầng từ tên công việc'); };
+      d.querySelector('#bOk').onclick = () => {
+        const floors = [...body.querySelectorAll('tr')].map(tr => { const g = k => tr.querySelector(`[data-f="${k}"]`).value; return { name: g('name').trim(), kind: g('kind'), area: vnNum(g('area')), h: vnNum(g('h')) || 0 }; }).filter(f => f.name);
+        if (!floors.some(f => f.kind === 'floor')) { toast('Cần ít nhất một tầng loại “Tầng”.', true); return; }
+        pushUndo(); P.building = { ...(P.building || {}), width: Math.max(2, vnNum(d.querySelector('#bW').value) || 5), floors };
+        dlg.close(); renderAll(); toast('Đã cập nhật mô hình 3D');
+      };
+    });
+}
+function open3dLinks() {
+  const ctx = V3ctx || d3Context(), T = P.tasks;
+  const opts = sel => T.map((t, i) => `<option value="${t.id}" ${sel.includes(t.id) ? 'selected' : ''}>${i + 1} · ${'  '.repeat(t.level)}${esc(t.name).slice(0, 70)}</option>`).join('');
+  const els = ctx.els;
+  openDlg('Gán công việc cho mô hình 3D', `
+    <div class="hint" style="font-size:12.5px">Mỗi khối lấy mức hoàn thành từ các công việc được chọn (giữ Ctrl để chọn nhiều). Chọn một hạng mục tổng hợp là lấy toàn bộ việc con. Ứng dụng đã tự gắn theo tên tầng; chỉ cần sửa chỗ chưa đúng.</div>
+    <div class="links3d">${els.map(e => `<div class="fld"><label>${esc(e.label)} <span class="muted">(${(ctx.L[e.key] || []).length} việc)</span></label><select multiple size="4" data-key="${e.key}">${opts(ctx.L[e.key] || [])}</select></div>`).join('')}</div>`,
+    `<button class="tb" id="lAuto">Tự gắn lại theo tên</button><button class="tb" data-close>Hủy</button><button class="tb primary" id="lOk">Lưu</button>`,
+    d => {
+      d.querySelector('#lAuto').onclick = () => { pushUndo(); P.building = { ...(P.building || {}), links: null }; dlg.close(); renderAll(); toast('Đã gắn lại công việc theo tên'); };
+      d.querySelector('#lOk').onclick = () => {
+        const links = {}; d.querySelectorAll('select[data-key]').forEach(s => { links[s.dataset.key] = [...s.selectedOptions].map(o => o.value); });
+        pushUndo(); P.building = { ...(P.building || {}), links }; dlg.close(); renderAll(); toast('Đã lưu cách gắn công việc');
+      };
+    });
+}
+function d3Shot() {
+  if (!V3) return; const url = V3.snapshot();
+  fetch(url).then(r => r.blob()).then(b => offerFile(safeName(P.name) + '-3d-' + isoOf(UI.d3mode === 'actual' ? S.dataDay : UI.d3day) + '.png', b));
+}
+
 /* ---------- files ---------- */
 const safeName = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'tien-do';
 function offerFile(filename, data) {
@@ -1258,7 +1375,7 @@ $('#bSave').onclick = saveJson; $('#bXlsx').onclick = exportXlsx; $('#bSettings'
 $('#tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-view]'); if (!b) return; UI.view = b.dataset.view;
   document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
-  $('#vPlan').hidden = UI.view !== 'plan'; $('#vReport').hidden = UI.view !== 'report'; renderAll();
+  $('#vPlan').hidden = UI.view !== 'plan'; $('#vReport').hidden = UI.view !== 'report'; $('#v3d').hidden = UI.view !== '3d'; renderAll();
 });
 $('#ribbon').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -1342,6 +1459,14 @@ document.addEventListener('paste', e => {
   if (/\t|\n/.test(txt.trim())) { const rows = txt.split(/\r?\n/).filter(l => l.trim()).map(l => l.split('\t')); importRows(rows, 'insert'); return; }
   if (CLIP) pasteClip(); else toast('Chưa có dòng nào được chép. Chọn dòng rồi bấm Ctrl+C, hoặc copy một bảng trong Excel.', true);
 });
+$('#v3d').addEventListener('click', e => {
+  const m = e.target.closest('[data-d3mode]'); if (m) { UI.d3mode = m.dataset.d3mode; if (V3play) { clearInterval(V3play); V3play = 0; } render3d(); return; }
+  const b = e.target.closest('[data-d3]'); if (!b) return;
+  const a = b.dataset.d3;
+  if (a === 'play') d3Play(); else if (a === 'config') open3dConfig(); else if (a === 'links') open3dLinks(); else if (a === 'shot') d3Shot();
+  else if (a === 'reset') { V3 && V3.resetView(); V3sig = ''; render3d(); } else if (a === 'closeinfo') { V3pick = null; d3Info(); }
+});
+$('#v3d').addEventListener('input', e => { if (e.target.id === 'd3range') { UI.d3day = +e.target.value; d3Apply(); } });
 let rzT; window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (UI.view === 'plan') { renderGantt(); renderRes(); } }, 150); });
 
 /* ---------- boot ---------- */
