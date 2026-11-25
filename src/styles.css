@@ -92,6 +92,7 @@ button{cursor:pointer}
 .tbody{scrollbar-width:thin}
 
 .grid{display:grid;grid-template-columns:40px 56px 290px 52px 96px 96px 112px 58px 108px 62px 66px;width:max-content;min-width:100%}
+.grid.money{grid-template-columns:40px 56px 290px 52px 96px 96px 112px 58px 108px 62px 66px 86px 86px}
 .thead .grid{height:44px}
 .th{display:flex;align-items:center;padding:0 6px;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);border-right:1px solid var(--line);white-space:nowrap}
 .th.c{justify-content:center}
@@ -293,3 +294,27 @@ dialog::backdrop{background:rgba(12,17,25,.45)}
   .row2,.row3{grid-template-columns:minmax(0,1fr)}
   .report{overflow:visible}
 }
+.rt th.r,.rt td.r{text-align:right}
+.rt td.neg{color:var(--crit);font-weight:600}
+.cf-in{fill:var(--ok)}
+.cf-out{fill:var(--crit);fill-opacity:.85}
+.cf-cum{fill:none;stroke:var(--accent-strong);stroke-width:2.2}
+.cf-plan{fill:none;stroke:var(--faint);stroke-width:1.6;stroke-dasharray:6 4}
+.cf-dot{fill:var(--accent-strong);stroke:var(--surface);stroke-width:1.5}
+.cf-neg{fill:var(--crit);stroke:var(--surface);stroke-width:1.5}
+.ac-in{width:90px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);padding:1px 6px;font-family:var(--font-num);font-size:12px}
+.qsum{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px}
+.qsum>div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.qsum .k{display:block;font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.qsum b{font-family:var(--font-num);font-size:13px;overflow-wrap:anywhere}
+.qtbl{max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.qtbl thead th{position:sticky;top:0;background:var(--surface)}
+.qwarn{color:var(--crit);font-size:11.5px;line-height:1.4}
+.chips{display:flex;flex-wrap:wrap;gap:6px 14px}
+.qsel{max-width:300px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);padding:4px 6px}
+.pay-total{font-family:var(--font-num);font-size:18px;font-weight:700;color:var(--ok)}
+.pay-total.bad{color:var(--crit)}
+.rtab.pay select{width:100%;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);padding:5px 6px}
+.rtab.pay input[type=date]{width:100%}
+dialog{width:min(860px,calc(100vw - 32px))}
+@media (max-width:760px){.qsum{grid-template-columns:1fr 1fr}}

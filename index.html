@@ -25,6 +25,7 @@
       <button class="tb" id="bNew"></button>
       <button class="tb" id="bOpen" title="Mở tệp .json hoặc Excel (Ctrl+O)"></button>
       <button class="tb" id="bSave" title="Lưu tệp .json (Ctrl+S)"></button>
+      <button class="tb" id="bQuote" title="Nhập file báo giá / BOQ (Excel) để có giá trị, chi phí và dòng tiền"></button>
       <button class="tb" id="bXlsx" title="Xuất bảng tiến độ ra Excel"></button>
       <button class="ib" id="bSettings" title="Cấu hình dự án"></button>
       <button class="ib" id="bHelp" title="Phím tắt & hướng dẫn (F1)"></button>
@@ -57,6 +58,7 @@
 </div>
 
 <input type="file" id="fileIn" accept=".json,.xlsx,.xls,.csv" hidden>
+<input type="file" id="quoteIn" accept=".xlsx,.xls,.xlsm" hidden>
 <dialog id="dlg"></dialog>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 

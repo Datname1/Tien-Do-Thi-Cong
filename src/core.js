@@ -127,6 +127,8 @@ function schedule(P, useDD) {
     }
     lf[i] = L;
   }
+  const hasMoney = leaves.some(i => (+T[i].val || 0) > 0);
+  const weight = j => hasMoney ? Math.max(+T[j].val || 0, 0) : Math.max(+T[j].dur || 0, 0);
   const start = new Array(n), finish = new Array(n), tf = new Array(n).fill(null), crit = new Array(n).fill(false);
   const pct = new Array(n).fill(0), planned = new Array(n).fill(0), late = new Array(n).fill(false), vr = new Array(n).fill(null);
   const blS = new Array(n).fill(null), blF = new Array(n).fill(null);
@@ -146,7 +148,7 @@ function schedule(P, useDD) {
   });
   for (let i = n - 1; i >= 0; i--) if (st.isSum[i]) {
     const L = leavesOf(i); let a = Infinity, b = -Infinity, w = 0, wp = 0, wpl = 0, mt = Infinity, ba = Infinity, bb = -Infinity, lt = false;
-    L.forEach(j => { a = Math.min(a, start[j]); b = Math.max(b, finish[j]); const wt = Math.max(+T[j].dur || 0, 0); w += wt; wp += wt * pct[j]; wpl += wt * planned[j]; mt = Math.min(mt, tf[j]); if (blS[j] != null) { ba = Math.min(ba, blS[j]); bb = Math.max(bb, blF[j]); } lt = lt || late[j]; });
+    L.forEach(j => { a = Math.min(a, start[j]); b = Math.max(b, finish[j]); const wt = weight(j); w += wt; wp += wt * pct[j]; wpl += wt * planned[j]; mt = Math.min(mt, tf[j]); if (blS[j] != null) { ba = Math.min(ba, blS[j]); bb = Math.max(bb, blF[j]); } lt = lt || late[j]; });
     start[i] = a; finish[i] = b; tf[i] = mt; late[i] = lt;
     pct[i] = w ? wp / w : (L.length ? L.reduce((s, j) => s + pct[j], 0) / L.length : 0);
     planned[i] = w ? wpl / w : 0;
@@ -156,9 +158,93 @@ function schedule(P, useDD) {
   const projStart = leaves.length ? Math.min(...leaves.map(i => start[i])) : cal.day(0);
   const projFinish = leaves.length ? Math.max(...leaves.map(i => finish[i])) : cal.day(0);
   let W = 0, WP = 0, WPL = 0, bMax = null;
-  leaves.forEach(i => { const wt = Math.max(+T[i].dur || 0, 0); W += wt; WP += wt * pct[i]; WPL += wt * planned[i]; if (blF[i] != null) bMax = bMax == null ? blF[i] : Math.max(bMax, blF[i]); });
-  return { st, cal, idIdx, leaves, es, ef, du, start, finish, tf, crit, pct, planned, late, vr, blS, blF, cycle, badLink,
+  leaves.forEach(i => { const wt = weight(i); W += wt; WP += wt * pct[i]; WPL += wt * planned[i]; if (blF[i] != null) bMax = bMax == null ? blF[i] : Math.max(bMax, blF[i]); });
+  const val = new Array(n).fill(0), cost = new Array(n).fill(0);
+  leaves.forEach(i => { val[i] = Math.max(+T[i].val || 0, 0); cost[i] = Math.max(+T[i].cost || 0, 0); });
+  for (let i = n - 1; i >= 0; i--) if (st.isSum[i]) for (let j = i + 1; j <= st.end[i]; j++) if (!st.isSum[j]) { val[i] += val[j]; cost[i] += cost[j]; }
+  return { st, cal, idIdx, leaves, es, ef, du, start, finish, tf, crit, pct, planned, late, vr, blS, blF, cycle, badLink, val, cost, hasMoney,
+    totalVal: leaves.reduce((a, i) => a + val[i], 0), totalCost: leaves.reduce((a, i) => a + cost[i], 0),
     projStart, projFinish, blFinish: bMax, dataDay, D, actualPct: W ? WP / W : 0, plannedPct: W ? WPL / W : 0, workDays: PE };
+}
+
+/* ---------- dòng tiền ---------- */
+// Rải một khoản tiền đều theo ngày làm việc trong [a, b]; mốc (a > b hoặc không có ngày làm) dồn vào ngày a
+function spread(cal, a, b, amount, add) {
+  if (!amount) return;
+  const days = []; for (let d = a; d <= b; d++) if (cal.isWork(d)) days.push(d);
+  if (!days.length) { add(a, amount); return; }
+  const per = amount / days.length; days.forEach(d => add(d, per));
+}
+const monthKey = d => isoOf(d).slice(0, 7);
+function paymentDates(P, S, useBaseline) {
+  const contract = +P.contractValue || S.totalVal;
+  return (P.payments || []).map(p => {
+    let d = null;
+    if (p.kind === 'start') d = useBaseline && S.blS.some(v => v != null) ? Math.min(...S.leaves.map(i => S.blS[i] ?? S.start[i])) : S.projStart;
+    else if (p.kind === 'date') d = toDay(p.date);
+    else { const i = S.idIdx.get(p.taskId); if (i != null) d = (useBaseline && S.blF[i] != null ? S.blF[i] : S.finish[i]) + 1; }
+    if (d == null) return null;
+    return { name: p.name, pct: +p.pct || 0, day: d + (+p.lag || 0), amount: contract * (+p.pct || 0) / 100 };
+  }).filter(Boolean);
+}
+/* Dòng tiền theo tháng: chi theo tiến độ (giá vốn), thu theo đợt thanh toán (hoặc theo giá trị làm được nếu chưa khai báo đợt) */
+function cashFlow(P, S) {
+  const T = P.tasks, cal = S.cal, D = S.dataDay, months = new Map();
+  const bucket = k => { if (!months.has(k)) months.set(k, { key: k, planOut: 0, fcOut: 0, planIn: 0, fcIn: 0 }); return months.get(k); };
+  const addTo = f => (d, v) => { bucket(monthKey(d))[f] += v; };
+  const byStages = (P.payments || []).length > 0;
+  S.leaves.forEach(i => {
+    const c = S.cost[i], v = S.val[i], ms = (+T[i].dur || 0) === 0;
+    const bs = S.blS[i] ?? S.start[i], bf = S.blF[i] ?? S.finish[i];
+    spread(cal, bs, ms ? bs - 1 : bf, c, addTo('planOut'));
+    if (!byStages) spread(cal, bs, ms ? bs - 1 : bf, v, addTo('planIn'));
+    // dự báo: phần đã làm nằm trước ngày báo cáo, phần còn lại theo lịch hiện tại
+    const p = S.pct[i] / 100, s0 = S.start[i], f0 = S.finish[i];
+    const fc = (amt, f) => {
+      if (p > 0) spread(cal, s0, Math.min(f0, D - 1), amt * p, addTo(f));
+      if (p < 1) spread(cal, Math.max(s0, D), ms ? Math.max(s0, D) - 1 : Math.max(f0, D), amt * (1 - p), addTo(f));
+    };
+    fc(c, 'fcOut'); if (!byStages) fc(v, 'fcIn');
+  });
+  if (byStages) {
+    paymentDates(P, S, true).forEach(x => { bucket(monthKey(x.day)).planIn += x.amount; });
+    paymentDates(P, S, false).forEach(x => { bucket(monthKey(x.day)).fcIn += x.amount; });
+  }
+  const list = [...months.values()].sort((a, b) => a.key < b.key ? -1 : 1);
+  // lấp các tháng trống ở giữa
+  const filled = [];
+  if (list.length) {
+    let [y, m] = list[0].key.split('-').map(Number); const last = list[list.length - 1].key;
+    for (;;) { const k = `${y}-${pad(m)}`; filled.push(months.get(k) || { key: k, planOut: 0, fcOut: 0, planIn: 0, fcIn: 0 }); if (k === last) break; m++; if (m > 12) { m = 1; y++; } }
+  }
+  let cp = 0, cf = 0;
+  filled.forEach(r => { r.planNet = r.planIn - r.planOut; r.fcNet = r.fcIn - r.fcOut; cp += r.planNet; cf += r.fcNet; r.planCum = cp; r.fcCum = cf; });
+  return { months: filled, byStages, stages: byStages ? paymentDates(P, S, false) : [] };
+}
+/* Giá trị thu được (EVM) tại ngày báo cáo, tính theo giá vốn nếu có, không thì theo giá trị */
+function evm(P, S) {
+  const base = S.totalCost > 0 ? S.cost : S.val, use = S.totalCost > 0 ? 'cost' : 'val';
+  let BAC = 0, PV = 0, EV = 0;
+  S.leaves.forEach(i => { BAC += base[i]; PV += base[i] * S.planned[i] / 100; EV += base[i] * S.pct[i] / 100; });
+  const AC = P.actualCost != null && P.actualCost !== '' ? +P.actualCost : null;
+  const SPI = PV > 0 ? EV / PV : null, CPI = AC && EV > 0 ? EV / AC : null;
+  return { use, BAC, PV, EV, AC, SPI, CPI, SV: EV - PV, CV: AC != null ? EV - AC : null, EAC: CPI ? BAC / CPI : null };
+}
+/* Đợt thanh toán mẫu, tự gắn vào các công việc tìm được theo tên */
+function defaultPayments(P, S) {
+  const T = P.tasks, f = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+  const leaves = S.leaves.slice().sort((a, b) => S.finish[a] - S.finish[b]);
+  const find = (re, pick = 'last') => { const L = leaves.filter(i => re.test(f(T[i].name))); return L.length ? T[pick === 'last' ? L[L.length - 1] : L[0]].id : null; };
+  const at = q => { if (!leaves.length) return null; const t = S.projStart + (S.projFinish - S.projStart) * q; let best = leaves[0]; leaves.forEach(i => { if (Math.abs(S.finish[i] - t) < Math.abs(S.finish[best] - t)) best = i; }); return T[best].id; };
+  const end = leaves.length ? T[leaves[leaves.length - 1]].id : null;
+  return [
+    { name: 'Tạm ứng khi khởi công', pct: 20, kind: 'start', lag: 0 },
+    { name: 'Hoàn thành móng', pct: 20, kind: 'task', taskId: find(/mong|da kieng/) || at(0.2), lag: 7 },
+    { name: 'Hoàn thành khung, cất nóc', pct: 20, kind: 'task', taskId: find(/cat noc|khung.*mai|mai\b|san mai/) || at(0.45), lag: 7 },
+    { name: 'Hoàn thành xây tô', pct: 20, kind: 'task', taskId: find(/xay|to trat|hoan thien/, 'first') || at(0.7), lag: 7 },
+    { name: 'Hoàn thiện, bàn giao', pct: 15, kind: 'task', taskId: find(/ban giao/) || end, lag: 7 },
+    { name: 'Quyết toán (giữ lại bảo hành)', pct: 5, kind: 'task', taskId: find(/ban giao/) || end, lag: 30 }
+  ].filter(p => p.kind !== 'task' || p.taskId);
 }
 
 function fmtPreds(t, idIdx) {
@@ -182,8 +268,8 @@ function parsePreds(str, T, selfIdx) {
 let _idn = 0;
 const newId = () => 't' + Date.now().toString(36).slice(-4) + (++_idn).toString(36) + Math.random().toString(36).slice(2, 5);
 
-function buildTasks(rows) { // rows: [level,name,dur,preds,res,pct]
-  const T = rows.map(r => ({ id: newId(), level: r[0], name: r[1], dur: r[2], preds: [], res: r[4] || '', pct: r[5] || 0, snet: null, bl: null }));
+function buildTasks(rows) { // rows: [level,name,dur,preds,res,pct,val,cost]
+  const T = rows.map(r => ({ id: newId(), level: r[0], name: r[1], dur: r[2], preds: [], res: r[4] || '', pct: r[5] || 0, snet: null, bl: null, val: r[6] || 0, cost: r[7] || 0 }));
   rows.forEach((r, i) => { if (r[3]) T[i].preds = parsePreds(r[3], T, i).links; });
   return T;
 }
@@ -245,6 +331,8 @@ function sampleProject() {
   ];
   const P = { v: 1, name: 'Nhà phố 1 trệt 3 lầu – mẫu ví dụ', contractor: 'Gói thầu xây dựng phần thô & hoàn thiện', start: '2026-09-07', workweek: 6,
     dataDate: '2026-11-21', useDataDate: true, holidays: VN_HOLIDAYS.map(h => ({ ...h })), resources: JSON.parse(JSON.stringify(DEFAULT_RES)), tasks: buildTasks(rows), sample: true };
+  // giá trị ví dụ (không phải số liệu thật): khoảng 14 triệu mỗi ngày công việc, giá vốn 86%
+  P.tasks.forEach(t => { const d = +t.dur || 0; if (d > 0) { t.val = Math.round(d * 14e6 / 1e5) * 1e5; t.cost = Math.round(t.val * 0.86 / 1e5) * 1e5; } });
   setBaseline(P, schedule(P, false)); P.baselineAt = '2026-09-04';
   return P;
 }
@@ -253,4 +341,4 @@ function setBaseline(P, S) {
   P.baselineAt = new Date().toISOString().slice(0, 10);
 }
 
-export { DAY, DEFAULT_RES, VN_HOLIDAYS, _idn, buildCal, buildTasks, dow, expandHolidays, fmtD, fmtDM, fmtPreds, isoOf, isoWeek, mkDay, mondayOf, newId, pad, parseDate, parsePreds, parseRes, sampleProject, schedule, setBaseline, structure, toDay };
+export { cashFlow, evm, defaultPayments, DAY, DEFAULT_RES, VN_HOLIDAYS, _idn, buildCal, buildTasks, dow, expandHolidays, fmtD, fmtDM, fmtPreds, isoOf, isoWeek, mkDay, mondayOf, newId, pad, parseDate, parsePreds, parseRes, sampleProject, schedule, setBaseline, structure, toDay };
